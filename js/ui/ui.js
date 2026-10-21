@@ -29,20 +29,28 @@ G.UI = (() => {
 
   function refreshCoins() {
     const s = G.DB.save;
-    $('coins').textContent = s ? s.coins.toLocaleString('es') : '0';
+    $('coins').textContent = s ? s.coins.toLocaleString(G.I18n.locale) : '0';
     const t = (s && s.tickets) || { t1: 0, t10: 0 };
     // Cada ticket con su número en un mismo trozo: la píldora es flex y, al estrecharse, los números se descolocaban.
     $('tickets-pill').innerHTML = `<span>${G.Icons.html('ticket', 18)} ${t.t1}</span><span>${G.Icons.html('ticket10', 18)} ${t.t10}</span>`;
     // En el servidor de red local no hay donaciones.
-    if (G.DB.mode === 'server') $('btn-support').classList.add('hidden');
-    // Punto de sincronización: verde = guardado en la nube, amarillo = guardando,
-    // rojo = sin conexión (se guarda en local y se sube al volver).
+    const srv = G.DB.mode === 'server';
+    if (srv) $('btn-support').classList.add('hidden');
+    // Punto de sincronización: verde = guardado en la nube, amarillo = hay cambios
+    // sin subir (sólo se suben con Guardar, desde el 20-10-2026; en la red local,
+    // solos a los pocos segundos), rojo = sin conexión.
     const st = G.DB.guest ? 'guest' : G.DB.syncState;
-    const TIP = { ok: G.DB.mode === 'server' ? 'Guardado en el servidor' : 'Guardado en la nube', syncing: 'Guardando…', pending: 'Guardando…',
-                  offline: 'Sin conexión: se subirá al volver', local: 'Guardado sólo en este navegador', guest: 'Invitado: no se guarda' };
+    const TIP = srv
+      ? { ok: 'Guardado en el servidor', syncing: 'Guardando…', pending: 'Guardando…',
+          offline: 'Sin conexión: se subirá al volver', local: 'Guardado sólo en este navegador', guest: 'Invitado: no se guarda' }
+      : { ok: 'Guardado en la nube', syncing: 'Guardando…', pending: 'Sin guardar en la nube: pulsa Guardar',
+          offline: 'Sin conexión: pulsa Guardar cuando vuelva', local: 'Guardado sólo en este navegador', guest: 'Invitado: no se guarda' };
     $('user-pill').innerHTML = G.Icons.html(G.DB.guest ? 'user' : 'crown', 18) + ' <span translate="no">' + (G.DB.guest ? G.T('Invitado') : (G.DB.user || '')) + '</span>' +
       `<i class="sync ${st}" title="${TIP[st] || ''}"></i>`;
     $('user-pill').title = TIP[st] || '';
+    // Botón Guardar: sólo con cuenta en la nube (en local ya se guarda al momento).
+    const sb = $('btn-save');
+    sb.classList.toggle('hidden', G.DB.guest || G.DB.mode !== 'cloud');
   }
 
   let toastEl = null, toastT = 0;
@@ -175,6 +183,17 @@ G.UI = (() => {
     G.Icons.installCss();
     wireLegal();
     G.DB.onSync(() => { if (!$('topbar').classList.contains('hidden')) refreshCoins(); });
+    const sb = $('btn-save');
+    sb.innerHTML = G.Icons.html('save', 18) + ' <span>Guardar</span>';
+    sb.onclick = async () => {
+      sb.disabled = true;
+      const r = await G.DB.saveNow();
+      sb.disabled = false;
+      const MSG = { local: 'Tu partida se guarda en este navegador.', guest: 'Como invitado la partida no se guarda.',
+                    done: 'Ya está todo guardado en la nube.', offline: 'Sin conexión: se guardará en cuanto vuelva.',
+                    fail: 'No se pudo guardar. Vuelve a probar en un momento.' };
+      toast(r.why === 'wait' ? `Se guarda en la nube en ${r.secs} s.` : r.why ? MSG[r.why] : '¡Partida guardada en la nube!', 3000);
+    };
     wireSounds();
     refreshSoundIcon();
     $('btn-sound').onclick = () => {
@@ -187,6 +206,7 @@ G.UI = (() => {
   // ---------------- sprites en canvas del DOM ----------------
 
   const live = new Set();
+  const byCanvas = new WeakMap();      // canvas -> su animación (para no recorrer todas)
   // Sólo se animan los canvas que están a la vista (la colección tiene cientos).
   const seen = new WeakMap();
   const io = 'IntersectionObserver' in window
@@ -204,12 +224,14 @@ G.UI = (() => {
    *                   que quepa, porque ahí no se compara con nada }
    */
   function sprite(cv, dex, opts = {}) {
-    for (const s of live) if (s.cv === cv) live.delete(s);
+    const prev = byCanvas.get(cv);
+    if (prev) live.delete(prev);
     const a = new G.Sprites.Animator(dex, 1, !!opts.shiny);
     a.dir = opts.dir || 0;
     a.loop(opts.anim || 'Idle');
     const s = { cv, ctx: cv.getContext('2d'), a, dex, opts, t: Math.random() * 3, spinT: 0, sparkT: 0 };
     live.add(s);
+    byCanvas.set(cv, s);
     if (io) io.observe(cv);
     return s;
   }

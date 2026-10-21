@@ -80,11 +80,15 @@ def page(pid, lang, title, desc, body, ld=None):
     legal = ('PokéSurvivor es un juego de fans <b>gratuito y sin ánimo de lucro</b>, sin anuncios ni compras (sólo donaciones voluntarias para los servidores). No está afiliado a Nintendo, Creatures, '
              'GAME FREAK ni The Pokémon Company; Pokémon y sus personajes son propiedad de sus respectivos dueños. Sprites de PMD SpriteCollab '
              '(CC BY-NC 4.0) · datos de PokéAPI · música y sonidos originales. No tiene ninguna criptomoneda ni token oficial: '
-             'cualquiera que use su nombre es de terceros y no nos hacemos cargo de compras ni inversiones.') if lang == 'es' else (
+             'cualquiera que use su nombre es de terceros y no nos hacemos cargo de compras ni inversiones. '
+             '<b>La única web oficial es pokesurvivor.com</b> y el juego es y será gratis: si alguien te pide pagar, no somos nosotros. '
+             'Código bajo PolyForm Noncommercial 1.0.0 (hasta el 14-10-2026, MIT).') if lang == 'es' else (
              'PokéSurvivor is a <b>free, non-profit</b> fan game with no ads or purchases (only voluntary donations for the servers). It is not affiliated with Nintendo, Creatures, GAME FREAK '
              'or The Pokémon Company; Pokémon and its characters are owned by their respective owners. Sprites from PMD SpriteCollab (CC BY-NC 4.0) '
              '· data from PokéAPI · original music and sounds. It has no official cryptocurrency or token: any using its name '
-             'belongs to third parties and we take no responsibility for purchases or investments.')
+             'belongs to third parties and we take no responsibility for purchases or investments. '
+             '<b>The only official website is pokesurvivor.com</b> and the game is and always will be free: if anyone asks you to pay, it isn\'t us. '
+             'Code under PolyForm Noncommercial 1.0.0 (MIT up to 14-10-2026).')
     ldj = ('<script type="application/ld+json">\n' + json.dumps(ld, ensure_ascii=False) + '\n</script>') if ld else ''
     return f'''<!doctype html>
 <html lang="{lang}">
@@ -109,6 +113,7 @@ def page(pid, lang, title, desc, body, ld=None):
 <link rel="icon" type="image/png" sizes="144x144" href="{up}assets/icons/icon-144.png">
 <link rel="apple-touch-icon" href="{up}assets/icons/icon-180.png">
 <link rel="stylesheet" href="{up}css/pages.css">
+<script src="{up}js/noframe.js"></script>
 {ldj}
 </head>
 <body>
@@ -473,6 +478,12 @@ def ach_page(lang):
 
 # ================= novedades =================
 NEWS = [
+ ('2026-10-14', ('Coloca los botones a tu gusto en el móvil', 'Place the buttons your way on mobile'),
+  ('En Ajustes > Controles > Colocar los botones puedes arrastrar los ataques, la pausa y el joystick a donde quieras, y elegir un joystick fijo.',
+   'In Settings > Controls > Place the buttons you can drag the attacks, the pause button and the joystick wherever you want, and choose a fixed joystick.')),
+ ('2026-10-14', ('La única web oficial es pokesurvivor.com', 'The only official website is pokesurvivor.com'),
+  ('PokéSurvivor es y será gratis. Si alguna otra web te pide pagar por tickets, monedas o lo que sea, no somos nosotros: es una copia. Desde hoy el código del juego va bajo una licencia no comercial (PolyForm Noncommercial 1.0.0).',
+   'PokéSurvivor is and always will be free. If any other website asks you to pay for tickets, coins or anything else, it isn’t us: it is a copy. From today the game’s code is under a non-commercial license (PolyForm Noncommercial 1.0.0).')),
  ('2026-10-14', ('Recupera tu cuenta con Gmail', 'Recover your account with Gmail'),
   ('Si juegas con nombre y contraseña, ya puedes vincular tu Gmail: si olvidas la contraseña, entras con Google y es tu misma cuenta.',
    'If you play with a name and password, you can now link your Gmail: if you forget your password, sign in with Google and it is the same account.')),
@@ -561,8 +572,12 @@ def game_en():
     dev = open(os.path.join(ROOT, 'dev.html'), encoding='utf-8').read()
     idx = open(os.path.join(ROOT, 'index.html'), encoding='utf-8').read()
     app = re.search(r'<script defer src="js/app\.min\.js\?v=[^"]+"></script>', idx).group(0)
+    loc = re.search(r'<script src="js/core/locales\.js\?v=[^"]+"></script>', idx).group(0)
+    css = re.search(r'<link rel="stylesheet" href="css/style\.css\?v=[^"]+">', idx).group(0)
     a, b = dev.index('<!-- scripts:begin -->'), dev.index('<!-- scripts:end -->') + len('<!-- scripts:end -->')
     src = dev[:a] + app + dev[b:]
+    src = src.replace('<script src="js/core/locales.js"></script>', loc)
+    src = src.replace('<link rel="stylesheet" href="css/style.css">', css)
     src = re.sub(r'<!-- seo:(begin|end) -->\n?', '', src)
     src = re.sub(r'<meta name="robots" content="noindex">\s*', '', src)
     src = re.sub(r'<!-- dev\.html: página fuente[^>]*-->\n?', '', src)

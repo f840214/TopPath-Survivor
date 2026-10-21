@@ -1,6 +1,7 @@
 /* ============ lang-zh.js — 繁體中文 ============
  * 來源：社群補丁「PokéSurvivor 繁體中文補丁」v1.3.3（MIT）。鍵是畫面上的西班牙文原文，
  * 用法與 lang-en.js 相同（見 js/core/i18n.js）。{x} 是插入的名稱或數字。
+ * tools/build_langs.js 會把它併入 js/lang/zh-Hant.js（重複的鍵以 lang-zh-hant.js 為準）。
  */
 G.I18n.add({
   "Buenos amigos": "好朋友",
@@ -3732,5 +3733,12 @@ G.I18n.add({
   "Partida no válida.": "存檔無效。",
   "Contraseña incorrecta.": "密碼錯誤。",
   "Juega en tu red local": "在區域網路中遊玩",
-  "El juego se puede instalar en un ordenador de una red local (sin internet): las cuentas y las partidas se guardan en ese ordenador y se entra desde cualquier aparato de la red con nombre y contraseña.": "遊戲可以安裝在區域網路內的一台電腦上（不需要網際網路）：帳號與存檔都保存在那台電腦，網路內任何裝置都能用名稱與密碼登入。"
-}, 'zh');
+  "El juego se puede instalar en un ordenador de una red local (sin internet): las cuentas y las partidas se guardan en ese ordenador y se entra desde cualquier aparato de la red con nombre y contraseña.": "遊戲可以安裝在區域網路內的一台電腦上（不需要網際網路）：帳號與存檔都保存在那台電腦，網路內任何裝置都能用名稱與密碼登入。",
+  // Novedades del 15, 16 y 21-10-2026
+  'Amigos (red local): tarjetas con el compañero de cada jugador, buscador y lista negra (los bloqueados no te pueden invitar ni entrar en tus salas). Las salas se crean desde un panel nuevo y las Novedades están en el menú.': '好友（區網）：每位玩家都有附上夥伴的卡片、搜尋框和黑名單（被封鎖的玩家無法邀請你，也進不了你的房間）。房間改從新的面板建立，更新日誌移到選單裡。',
+  'Belle llega a Kanto': 'Belle 來到關都',
+  'Nuevo personaje: Belle (Veneno/Agua), Legendaria del banner de Kanto. Tiene su propio repertorio de 8 movimientos (empieza con Picotazo Veneno) y no sale como salvaje ni como jefe.': '新角色：Belle（毒／水），關都卡池的傳說角色。擁有專屬的 8 種招式（初始為毒針），不會以野生或首領的身分出現。',
+  'Inglés y chino, y lo nuevo de la versión oficial': '英文與中文，以及官方版的新內容',
+  'El juego está en inglés y en chino tradicional (se elige en Ajustes). El español ya no se ofrece.': '遊戲提供英文與繁體中文（在「設定」中選擇），不再提供西班牙文。',
+  'Llega todo lo nuevo de la versión oficial hasta el 20 de octubre (38 ataques nuevos, Movimiento inicial, colección con buscador y favoritos, cooperativo más seguro...), sin perder nada de la red local.': '加入官方版截至 10 月 20 日的所有新內容（38 種新招式、初始招式、可搜尋和加入最愛的圖鑑、更安全的合作模式……），區網版的功能全部保留。'
+}, 'zh-Hant');

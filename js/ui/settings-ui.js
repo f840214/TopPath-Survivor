@@ -1,6 +1,6 @@
 /* ============ settings-ui.js — pantalla de Ajustes (PC y móvil) ============
  * Se abre por encima de lo que haya (menú o pausa) y al cerrar vuelve ahí.
- * Pestañas: Sonido · Gráficos · Controles · Cuenta · Acerca de.
+ * Pestañas: Sonido · Gráficos · Controles · Accesibilidad · Cuenta · Acerca de.
  * Los ajustes son de este dispositivo (G.Settings / G.Audio en el navegador).
  */
 G.SettingsUI = (() => {
@@ -12,6 +12,10 @@ G.SettingsUI = (() => {
 
   function init() {
     document.querySelectorAll('#set-tabs .gen-tab').forEach(b => { b.onclick = () => { tab = b.dataset.t; render(); }; });
+    // En el móvil no hay apuntado a mano (siempre apunta solo): fuera la pestaña, que sólo tenía eso.
+    if (G.Settings.touch) document.querySelector('#set-tabs [data-t="a11y"]').classList.add('hidden');
+    // Al conectar o quitar un mando con Controles abierto, se ve al momento.
+    for (const ev of ['gamepadconnected', 'gamepaddisconnected']) addEventListener(ev, () => { if (isOpen() && tab === 'ctl') render(); });
     $('set-close').onclick = close;
     $('btn-settings').innerHTML = G.Icons.html('gear', 20);
     $('btn-settings').onclick = () => open();
@@ -75,7 +79,7 @@ G.SettingsUI = (() => {
     } else if (tab === 'gfx') {
       const auto = ['baja', 'media', 'alta'][G.Settings.autoLevel];
       box.innerHTML = section('Idioma', 'El juego se recarga al cambiarlo.')
-        + `<div class="chips set-chips" translate="no">${[['es', 'Español'], ['en', 'English'], ['zh', '繁體中文']].map(([v, l]) =>
+        + `<div class="chips set-chips" translate="no">${G.I18n.choices.map(([v, l]) =>
              `<button class="chip ${G.I18n.lang === v ? 'on' : ''}" data-lang="${v}">${l}</button>`).join('')}</div>`
         + section('Calidad', 'Cuántos efectos y partículas se dibujan. <b>Auto</b> la baja sola si el juego va a tirones (ahora: ' + auto + ').')
         + choice('quality', [['auto', 'Auto'], ['high', 'Alta'], ['mid', 'Media'], ['low', 'Baja']])
@@ -87,10 +91,27 @@ G.SettingsUI = (() => {
              <button class="btn small" id="set-full">${isFull() ? 'Salir' : 'Activar'}</button></div>`
            : iosTip() ? `<div class="set-row"><div class="grow"><b>Pantalla completa</b><small>${esc(IOS_TIP)}</small></div></div>` : '');
     } else if (tab === 'ctl') {
-      box.innerHTML = section('En móvil o tablet')
+      const pn = G.Pad.name;
+      box.innerHTML = section('Con mando', pn
+          ? 'Mando conectado: <b translate="no">' + esc(pn.replace(/\s*\(.*$/, '')) + '</b>'
+          : 'Xbox, PlayStation, Switch y la mayoría de mandos USB o Bluetooth. Conéctalo y pulsa cualquier botón.')
+        + toggle('gamepad', 'Usar mando', 'Moverte, cambiar de ataque y manejar los menús con el mando.')
+        + toggle('padRumble', 'Vibración', 'El mando vibra al recibir daño (si el mando y el navegador lo permiten).')
+        + `<div class="keys">
+             <div><span class="padkey">Stick izq.</span> o <span class="padkey">Cruceta</span></div><span>moverse · elegir en los menús</span>
+             <div><span class="padkey">LB</span> / <span class="padkey">RB</span></div><span>ataque anterior / siguiente</span>
+             <div><span class="padkey">Start</span></div><span>pausa</span>
+             <div><span class="padkey">A</span></div><span>pulsar (en los menús) · saltar la animación de Arceus</span>
+             <div><span class="padkey">B</span></div><span>atrás / cerrar</span>
+             <div><span class="padkey">Y</span></div><span>cambiar las cartas al subir de nivel</span>
+             <div><span class="padkey">Stick der.</span></div><span>desplazar las listas · apuntar (si activas Apuntar a mano en Accesibilidad)</span>
+           </div>`
+        + section('En móvil o tablet')
         + `<p class="sub">Pon el dedo en cualquier parte y arrastra para moverte: el joystick aparece donde tocas. Toca un ataque de abajo para cambiarlo y el botón de arriba a la derecha para pausar. Se juega en horizontal.</p>`
         + `<div class="set-row"><div class="grow"><b>Tamaño del joystick</b><small>Cuánto hay que arrastrar el dedo.</small></div></div>`
         + choice('stick', [[0.8, 'Pequeño'], [1, 'Normal'], [1.25, 'Grande']])
+        + `<div class="set-row"><div class="grow"><b>Colocar los botones</b><small>Pon los ataques, la pausa y el joystick (fijo, si quieres) donde quieras de la pantalla.</small></div>
+             <button class="btn small" id="set-layout">Colocar</button></div>`
         + section('En PC')
         + `<div class="keys">
              <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> o flechas</div><span>moverse</span>
@@ -99,6 +120,9 @@ G.SettingsUI = (() => {
              <div><kbd>Esc</kbd> o <kbd>P</kbd></div><span>pausa</span>
              <div><kbd>1</kbd>–<kbd>3</kbd></div><span>elegir carta al subir de nivel</span>
            </div>`;
+    } else if (tab === 'a11y') {
+      box.innerHTML = section('Apuntado')
+        + toggle('aimManual', 'Apuntar a mano', 'Tus ataques van hacia el ratón (o hacia donde empujes el stick derecho del mando) en vez de al enemigo más cercano. Si sueltas el stick y no mueves el ratón, vuelve a apuntar solo. La cadena y los meteoros siguen buscando a los enemigos solos.');
     } else if (tab === 'acc') {
       renderAccount(box);
     } else {
@@ -149,6 +173,7 @@ G.SettingsUI = (() => {
       b.onclick = () => { const v = b.dataset.v; G.Settings.set(b.dataset.k, isNaN(+v) ? v : +v); render(); };
     });
     const full = $('set-full'); if (full) full.onclick = toggleFull;
+    const lay = $('set-layout'); if (lay) lay.onclick = () => G.LayoutUI.open();
     box.querySelectorAll('[data-lang]').forEach(b => { b.onclick = () => { if (b.dataset.lang !== G.I18n.lang) G.I18n.set(b.dataset.lang); }; });
     const lo = $('set-login'); if (lo) lo.onclick = () => { close(); leave(); };
     const out = $('set-logout'); if (out) out.onclick = () => { close(); leave(); };

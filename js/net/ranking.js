@@ -16,10 +16,13 @@
  *                   (all2 desde la Sentencia de Arceus: con el final en el
  *                    minuto 30, el histórico empezó de cero; las tablas viejas
  *                    s_all y s_all_pN se quedan en el servidor sin usarse)
+ *                   (all3 y todas las demás con una "r" desde el 18-10-2026:
+ *                    se acabó huir de Arceus corriendo y con veneno, y TODAS
+ *                    las tablas empezaron de cero)
  *   id = tu uid (solitario) o los uid del equipo ordenados y unidos con "_".
  *
  * Ahorros:
- *   - Lo leído se guarda 30 min en el navegador (cambiar de pestaña y volver: 0).
+ *   - Lo leído se guarda 2 h en el navegador (cambiar de pestaña y volver: 0).
  *   - Tus mejores marcas se recuerdan en el navegador: al acabar una partida
  *     no hay que leer nada para saber si has mejorado, y sólo se escribe
  *     donde mejoras.
@@ -48,7 +51,13 @@ G.Ranking = (() => {
   // importe y eran muchas lecturas y escrituras para nada: los que empiezan
   // mueren a menudo en el primer minuto; era 1 min hasta el 14-10-2026).
   const MIN_T = 120;
-  const TTL = 30 * 60 * 1000;            // caché de lo leído (30 min: menos lecturas de Firestore)
+  // En el histórico de cada Pokémon, 5 min: con casi mil tablas, la mayoría no
+  // llega a 50 marcas y aceptaban cualquier partida (2 escrituras cada vez; el
+  // ranking era ~1/5 de las escrituras de Firestore el 20-10-2026).
+  const MIN_T_MON = 300;
+  // Caché de lo leído: 2 h (era 30 min hasta el 20-10-2026). Tu marca nueva se
+  // ve al momento igual (al subirla se guarda en la caché lo que se escribió).
+  const TTL = 2 * 3600 * 1000;
 
   const fbx = () => G.DB.online ? G.DB.fb : null;
   const srvMode = () => G.DB.mode === 'server';
@@ -92,7 +101,7 @@ G.Ranking = (() => {
     return { year: t.getUTCFullYear(), week: Math.ceil(((t - y0) / 86400000 + 1) / 7) };
   }
 
-  const ALL = 'all2';                     // histórico (ver arriba)
+  const ALL = 'all3';                     // histórico (ver arriba)
   function periodIds(date = new Date()) {
     const { y, m, d } = madridDate(date);
     const w = isoWeek(y, m, d);
@@ -101,14 +110,15 @@ G.Ranking = (() => {
   }
 
   /*
-   * Nombres de las tablas: los de periodIds() salvo semana y mes, que llevan
-   * una "j" (desde la Sentencia de Arceus, 14-10-2026: empezaron de cero como el
-   * histórico, que tenían marcas de antes del final del minuto 30). periodIds()
-   * se queda igual porque también lo usan las misiones (progress.js).
+   * Nombres de las tablas: los de periodIds() con una "r" detrás (18-10-2026:
+   * todas desde cero tras el arreglo de la Sentencia; antes semana y mes
+   * llevaban una "j", del 14-10). periodIds() se queda igual porque también
+   * lo usan las misiones (progress.js). El histórico ya cambia de nombre (ALL).
    */
+  const GEN = 'r';
   function boardIds(date) {
     const p = periodIds(date);
-    return Object.assign({}, p, { w: p.w + 'j', m: p.m + 'j' });
+    return Object.assign({}, p, { d: p.d + GEN, w: p.w + GEN, m: p.m + GEN, y: p.y + GEN });
   }
 
   /** El filtro por Pokémon sólo existe en el histórico. */
@@ -185,31 +195,67 @@ G.Ranking = (() => {
 
   // ---------------- guardar ----------------
 
-  const rowOf = (id, v) => ({ id, t: v.t, uids: v.uids || [], names: v.names || [], dex: v.dex || [], shiny: v.shiny || [], lv: v.lv, kills: v.kills });
+  // Fila de otro jugador: todo limpio (ver G.U.int / str), sea lo que sea que haya en la base de datos.
+  const rowOf = (id, v) => {
+    const U = G.U; v = v || {};
+    return { id: U.str(String(id), 200), t: U.int(v.t, 86400), uids: U.list(v.uids, 4).map(x => U.str(x, 128)),
+             names: U.list(v.names, 4).map(x => U.str(x, 24)), dex: U.list(v.dex, 4).map(x => U.int(x, 2000)),
+             shiny: U.list(v.shiny, 4).map(x => x === true), lv: U.int(v.lv, 999) || 1, kills: U.int(v.kills, 1e9) };
+  };
   const sorted = top => Object.entries(top || {}).map(([id, v]) => rowOf(id, v)).sort((a, b) => b.t - a.t);
   const now = () => firebase.firestore.FieldValue.serverTimestamp();
 
   // ---------------- anti-trampas ----------------
 
-  /**
-   * Al empezar la PRIMERA partida de la sesión (en grupo, el anfitrión) el
-   * servidor apunta la hora: ninguna marca puede durar más que el tiempo real
-   * desde entonces (firestore.rules, validEntry). Una vez por sesión y no en
-   * cada partida (14-10-2026: eran casi 150.000 escrituras al día de más; es
-   * igual de seguro, porque la sesión siempre empieza antes que la partida).
-   * Antes se espera a que acabe de subirse la marca de la partida anterior.
+  /*
+   * Hasta el 20-10-2026, al empezar a jugar se apuntaba la hora en runs/{uid}
+   * y ninguna marca podía durar más que el tiempo real desde entonces. Era lo
+   * que más escribía en Firestore (1/3) y la regla lo leía en cada marca, para
+   * una protección que se esquivaba esperando una vez: se quitó. Quedan el tope
+   * de 45 min, nivel y derrotados con sentido y el baneo (firestore.rules).
    */
-  let busy = Promise.resolve(), runMarked = '';
-  function runStarted(mode) {
+  let busy = Promise.resolve();
+  /** Al empezar a jugar: sube las marcas del histórico que esperaban (ver DEFER). */
+  function runStarted() { flushDeferred(); }
+
+  /*
+   * Tu marca del histórico FUERA del top 50 (20-10-2026): nadie la ve, sólo
+   * sirve para tu puesto exacto, que ya se mira cada 6 h (RANK_TTL). Así que se
+   * sube como mucho cada DEFER; mientras, la mejor espera en el navegador y
+   * sale al acabar o empezar otra partida pasado ese tiempo. Si entras en el
+   * top 50 se sube al momento, como siempre.
+   */
+  const DEFER = 6 * 3600 * 1000, DEF = 'ps.rk.def';
+  const defKey = () => DEF + '.' + (fbx() ? fbx().uid : '');
+  function deferred() { try { return JSON.parse(localStorage.getItem(defKey()) || '{}'); } catch (e) { return {}; } }
+  function saveDeferred(d) { try { localStorage.setItem(defKey(), JSON.stringify(d)); } catch (e) { /* lleno */ } }
+  /** ¿Toca subirla ya (hace DEFER que no) o se deja esperando? → true si hay que subirla. */
+  function dueOrDefer(b, id, entry) {
+    const d = deferred(), k = b + ':' + id, up = (d[k] && d[k].up) || 0;
+    if (Date.now() - up >= DEFER) { d[k] = { up: Date.now() }; saveDeferred(d); return true; }
+    d[k] = { up, e: entry }; saveDeferred(d);
+    return false;
+  }
+  function flushDeferred() {
     const fb = fbx();
-    if (srvMode() || !fb || runMarked === fb.uid) return;
-    runMarked = fb.uid;
-    const go = n => fb.fs.collection('runs').doc(fb.uid).set({ startedAt: now(), mode })
-      .catch(e => {
-        console.warn('[Ranking] inicio:', e.code || e.message);
-        if (n < 2) setTimeout(() => go(n + 1), 15000); else runMarked = '';
-      });
-    busy.then(() => go(0));
+    if (srvMode() || !fb) return;
+    const d = deferred();
+    let changed = false;
+    for (const [k, v] of Object.entries(d)) {
+      if (!v || !v.e) { if (v && Date.now() - (v.up || 0) > DEFER) { delete d[k]; changed = true; } continue; }
+      if (Date.now() - (v.up || 0) < DEFER) continue;
+      const i = k.indexOf(':'), b = k.slice(0, i), id = k.slice(i + 1);
+      d[k] = { up: Date.now() }; changed = true;
+      // (Si ya hay una mejor en la nube, las reglas la rechazan: no pasa nada.)
+      col(b).doc(id).set(Object.assign({}, v.e, { at: now() })).catch(() => {});
+      mem.delete('r:' + b); try { localStorage.removeItem('ps.rk.c.r:' + b); } catch (e) { /* nada */ }
+    }
+    if (changed) saveDeferred(d);
+  }
+  /** Ya se ha subido por otro camino (entró en el top): nada que esperar. */
+  function clearDeferred(b, id) {
+    const d = deferred(), k = b + ':' + id;
+    if (d[k] && d[k].e) { d[k] = { up: Date.now() }; saveDeferred(d); }
   }
   /** La subida de una marca (para que la partida siguiente espere a que acabe). */
   function track(p) { busy = p.catch(() => {}); return p; }
@@ -239,9 +285,12 @@ G.Ranking = (() => {
         // Si la tabla ya está llena y no llegas al top 50, no hace falta tocar el resumen
         // (y en diario, semanal y mensual, ni siquiera se guarda la marca).
         const cached = cacheGet('s:' + b);
+        let waiting = false;
         if (thr && entry.t <= thr && !(cached && id in cached)) {
-          if (!topOnly) await col(b).doc(id).set(data);
-          else { known[key] = entry.t; return; }
+          if (topOnly) { known[key] = entry.t; return; }
+          // Histórico fuera del top 50: como mucho cada DEFER (ver arriba).
+          if (dueOrDefer(b, id, entry)) await col(b).doc(id).set(data);
+          else waiting = true;
         } else {
           let entered = true;
           let newTop = null;
@@ -249,7 +298,7 @@ G.Ranking = (() => {
             const s = await tx.get(sumRef(b));
             const top = Object.assign({}, s.exists ? s.data().top : {});
             // (Sin "shiny" si no hay ninguno: el resumen pesa menos.)
-            const mine = { t: entry.t, uids: entry.uids, names: entry.names, dex: entry.dex, lv: entry.lv, kills: entry.kills };
+            const mine = { t: entry.t, uids: entry.uids, names: entry.names, dex: entry.dex, shiny: entry.shiny, lv: entry.lv, kills: entry.kills };
             if (entry.shiny.some(Boolean)) mine.shiny = entry.shiny;
             let ev = '';
             // Ya estabas con una marca mejor (otro ordenador): nada que escribir.
@@ -269,10 +318,12 @@ G.Ranking = (() => {
           });
           if (newTop) { cacheSet('s:' + b, newTop); noteTop(b, newTop); }
           if (topOnly && !entered) { known[key] = entry.t; return; }
+          if (!topOnly) clearDeferred(b, id);
         }
         known[key] = entry.t;
         if (b.startsWith('g_')) known[b + ':*'] = Math.max(known[b + ':*'] || 0, entry.t);
-        mem.delete('r:' + b); try { localStorage.removeItem('ps.rk.c.r:' + b); } catch (e) { /* nada */ }
+        // (Si la marca espera para subir, tu puesto en la nube aún no ha cambiado.)
+        if (!waiting) { mem.delete('r:' + b); try { localStorage.removeItem('ps.rk.c.r:' + b); } catch (e) { /* nada */ } }
         if (period && period !== 'p' && !better.includes(period)) better.push(period);
       } catch (e) { console.warn('[Ranking] no se pudo guardar en', b, e.code || e.message); }
     }));
@@ -297,10 +348,11 @@ G.Ranking = (() => {
     }
     const fb = fbx();
     if (!fb || !G.Social.me || r.t < MIN_T) return [];
+    flushDeferred();
     const ids = boardIds();
     const entry = { t: r.t, uids: [fb.uid], names: [G.Social.me.name], dex: [r.dex], shiny: [!!r.shiny], lv: r.lv, kills: r.kills };
     const boards = PERIODS.map(([p]) => ['s_' + ids[p], p]);
-    boards.push(['s_' + ALL + '_p' + r.dex, 'p']);
+    if (r.t >= MIN_T_MON) boards.push(['s_' + ALL + '_p' + r.dex, 'p']);
     const better = await store(boards, fb.uid, entry);
     announce(better);
     return better;
@@ -324,7 +376,7 @@ G.Ranking = (() => {
                     shiny: ms.map(m => !!m.shiny), lv: r.lv, kills: r.kills };
     const ids = boardIds();
     const boards = PERIODS.map(([p]) => ['g_' + ids[p], p]);
-    for (const d of new Set(entry.dex)) boards.push(['g_' + ALL + '_p' + d, 'p']);
+    if (r.t >= MIN_T_MON) for (const d of new Set(entry.dex)) boards.push(['g_' + ALL + '_p' + d, 'p']);
     const better = await store(boards, id, entry);
     announce(better);
     return better;
@@ -332,7 +384,7 @@ G.Ranking = (() => {
 
   // ---------------- leer ----------------
 
-  /** El top 50 de una tabla (1 lectura, o 0 si se leyó hace menos de 30 min). */
+  /** El top 50 de una tabla (1 lectura, o 0 si se leyó hace menos de 2 h). */
   const inflight = new Map();             // tabla -> lectura en curso (la lista y tu puesto la comparten)
   async function summary(b) {
     const c = cacheGet('s:' + b);
@@ -360,11 +412,12 @@ G.Ranking = (() => {
     const b = board(mode, period, dex);
     const rows = sorted(await summary(b));
     if (!friendsOnly) return rows.slice(0, TOP);
+    await G.Social.ensureFriends();          // (la lista de amigos ya no se carga al entrar)
     const circle = [fb.uid, ...G.Social.friends.filter(f => f.status === 'ok').map(f => f.uid)].slice(0, 30);
     const inTop = rows.filter(r => r.uids.some(u => circle.includes(u)));
     // En diario, semanal, mensual y por Pokémon no hay marcas fuera del top 50.
     if (TOP_ONLY.has(period) || dex) return inTop;
-    // Los amigos que no están en el top 50: se buscan aparte (y se guardan 30 min).
+    // Los amigos que no están en el top 50: se buscan aparte (y se guardan 2 h).
     const ck = 'f:' + b + ':' + circle.slice().sort().join(',');
     let extra = cacheGet(ck);
     if (extra === undefined) {
@@ -411,11 +464,14 @@ G.Ranking = (() => {
     kb[mk] = mine ? mine.t : 0;
     saveBests(kb);
     let res = null;
-    if (mine) res = { pos: (await countAbove(b, mine.t)) + 1, t: mine.t, row: mine };
+    if (mine) { const above = await countAbove(b, mine.t); res = { pos: above + 1, capped: above >= RANK_CAP, t: mine.t, row: mine }; }
     cacheSet(ck, res);
     return res;
   }
 
+  // Tope del recuento: un count() cobra 1 lectura por cada 1.000 marcas que cuenta
+  // (en el histórico eran ~40 por consulta). Pasado el tope se enseña "#1000+".
+  const RANK_CAP = 1000;
   /**
    * Cuántas entradas tienen más tiempo. La versión "compat" del SDK no trae
    * count(), así que se usa la API REST de agregación (1 lectura por cada
@@ -430,7 +486,7 @@ G.Ranking = (() => {
     const body = { structuredAggregationQuery: {
       structuredQuery: { from: [{ collectionId: 'e' }],
         where: { fieldFilter: { field: { fieldPath: 't' }, op: 'GREATER_THAN', value: { integerValue: String(t) } } } },
-      aggregations: [{ alias: 'n', count: {} }] } };
+      aggregations: [{ alias: 'n', count: { upTo: String(RANK_CAP) } }] } };
     try {
       const r = await fetch(url, { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'content-type': 'application/json' }, body: JSON.stringify(body) });
       const j = await r.json();
@@ -504,7 +560,8 @@ G.Ranking = (() => {
     const by = new Map();
     for (const d of s.docs) {
       const v = d.data(), k = v.board + '__' + v.e;
-      if (!by.has(k)) by.set(k, { board: v.board, e: v.e, names: v.names || [], t: v.t, n: 0, ids: [], at: v.at && v.at.toMillis ? v.at.toMillis() : 0 });
+      if (!by.has(k)) by.set(k, { board: G.U.str(v.board, 40), e: G.U.str(v.e, 160), names: G.U.list(v.names, 4).map(x => G.U.str(x, 24)),
+                                  t: G.U.int(v.t, 86400), n: 0, ids: [], at: v.at && v.at.toMillis ? v.at.toMillis() : 0 });
       const g = by.get(k); g.n++; g.ids.push(d.id);
     }
     return [...by.values()].sort((a, b) => b.n - a.n || b.at - a.at);

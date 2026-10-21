@@ -26,6 +26,7 @@ G.Rift = (() => {
   const ARENA_R = 11, ARENA_TIME = 120, FROM = 75;
   let rift = null;          // { x, y, ttl, t, team } (team: enfrentamiento, equipo que la ha cogido)
   let arena = null;         // { tx, ty, r, dex, shiny, x, y, back, biome, t, phase, endT, bossId, team, mine }
+  let zone = null;          // dónde estaba la última arena { x, y, r } (ver leftBehind)
   let checkT = CHECK, asked = false, downT = 0, misses = 0, claimMsgT = 0;
   const authority = () => !G.Coop.active || G.Coop.isHost;
   const TS = () => G.Tiles.T * G.Sprites.PX;
@@ -38,7 +39,17 @@ G.Rift = (() => {
   /** ¿Está `o` dentro de la zona de la arena? (para no hacer salir enemigos allí) */
   function inside(o) { return !!arena && G.U.dist2(o.x, o.y, arena.x, arena.y) < (arena.r * TS() * 2) ** 2; }
 
-  function reset() { rift = null; arena = null; checkT = CHECK; asked = false; downT = 0; misses = 0; }
+  function reset() { rift = null; arena = null; zone = null; checkT = CHECK; asked = false; downT = 0; misses = 0; }
+
+  /**
+   * ¿Sigue este jugador en la arena aunque aquí ya se haya vuelto al mapa?
+   * En grupo, el anfitrión vuelve unas décimas antes que los invitados (el aviso
+   * tarda en llegar) y en ese rato los ve aún allí: el jefe que esperaba salía a su
+   * lado, a miles de metros, y ya no se le encontraba (ni salían más grietas).
+   */
+  function leftBehind(p) {
+    return !arena && !!zone && G.U.dist2(p.x, p.y, zone.x, zone.y) < zone.r * zone.r;
+  }
 
   // ---------------- grieta en el mapa ----------------
 
@@ -140,6 +151,7 @@ G.Rift = (() => {
       x: cfg.tx * ts + ts / 2, y: cfg.ty * ts + ts / 2,
       back: { x: pl.x, y: pl.y }, biome: G.World.biome, t: 0, phase: 'fight', endT: 0, bossId: 0, mine
     });
+    zone = { x: arena.x, y: arena.y, r: (cfg.r + 10) * ts };
     if (mine) rift = null; else if (rift) { rift.team = cfg.team; rift.ttl = Math.min(rift.ttl, 15); }
     asked = false; downT = 0;
     // (Enfrentamiento: el mapa sigue para los otros equipos: no se guardan los enemigos.)
@@ -306,7 +318,7 @@ G.Rift = (() => {
   }
 
   return {
-    reset, update, drawable, onEvent, inside,
+    reset, update, drawable, onEvent, inside, leftBehind,
     /** Anfitrión: un invitado ha tocado la grieta (enfrentamiento: con su equipo). */
     enterRequest(team = 0) { if (!arena && !(vs() && rift && rift.team && rift.team !== team)) start(null, team); },
     get rift() { return rift; }, get arena() { return arena; },

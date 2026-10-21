@@ -7,6 +7,15 @@ shinies y gacha por región. Música y efectos compuestos para el juego.
 HTML + CSS + JavaScript vanilla sobre Canvas 2D. Sin build, sin dependencias y
 **todo local**: no necesita internet para jugar.
 
+> **Autoría / Authorship**
+>
+> PokéSurvivor (su código y su música original) lo ha escrito y es de
+> **Jonathan Piera Torregrosa**, dueño de esta cuenta (JPTER78) y de pokesurvivor.com.
+> The source code and original music of PokéSurvivor are written and owned by
+> **Jonathan Piera Torregrosa**, owner of this GitHub account (JPTER78) and of
+> pokesurvivor.com. Google copyright removal request **4-2352000042234**
+> (against pokesurvivor.co) was submitted by me.
+
 > **Aviso sobre criptomonedas / Crypto disclaimer**
 >
 > PokéSurvivor **no tiene ninguna criptomoneda, token ni NFT oficial**, y yo no
@@ -96,9 +105,16 @@ jefe, la captura de un shiny salvaje y un shiny en el gacha.
 
 ## Licencia
 
-Código bajo MIT. Los sprites (CC BY-NC 4.0), la fuente (OFL) y las marcas de
-Pokémon tienen sus propias condiciones: ver [LICENSE](LICENSE) y
-[CREDITS.md](CREDITS.md). Proyecto de fan sin ánimo de lucro.
+Código bajo [PolyForm Noncommercial 1.0.0](LICENSE-NONCOMMERCIAL.md) desde el
+14-10-2026: se puede usar, estudiar y modificar, pero **no con fines
+comerciales** (ni vender el juego ni cobrar nada dentro de él). Las versiones
+hasta el commit `b297089` se publicaron bajo MIT. Los sprites (CC BY-NC 4.0),
+la fuente (OFL) y las marcas de Pokémon tienen sus propias condiciones: ver
+[LICENSE](LICENSE) y [CREDITS.md](CREDITS.md). Proyecto de fan sin ánimo de
+lucro.
+
+**La única web oficial es [pokesurvivor.com](https://pokesurvivor.com).** El
+juego es y será gratis: si alguien te pide pagar, no somos nosotros.
 
 ## Estructura
 

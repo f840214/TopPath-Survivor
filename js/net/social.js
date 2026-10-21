@@ -126,16 +126,30 @@ G.SocialCloud = (() => {
     return { ok: true };
   }
 
-  /** Presencia (latido), amigos e invitaciones. Nada de esto usa la Realtime Database. */
+  /*
+   * Amigos e invitaciones. Nada de esto usa la Realtime Database.
+   * Desde el 20-10-2026 la lista de amigos NO se carga al entrar (1 lectura por
+   * amigo en cada carga de la página, para todos): sólo al abrir Amigos, la sala
+   * o el ranking de amigos (ensureFriends). Las invitaciones sí se escuchan desde
+   * el principio si este navegador sabe que tienes amigos (hasFrKey); el servidor
+   * ya comprueba que sean de un amigo.
+   */
+  const hasFrKey = () => 'ps.hasfr.' + uid;
   function online() {
     if (beatT) return;                        // ya estaba en marcha
+    beatT = 1;
     if (fb.rtdb) fb.rtdb.goOffline();         // se conecta sólo al entrar en una sala
-    writeStatus();
-    clearInterval(beatT);
-    beatT = setInterval(() => { if (document.visibilityState === 'visible') writeStatus(); }, BEAT);
-    document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('pagehide', onHide);
-    listenFriends();
+    let known = false;
+    try { known = localStorage.getItem(hasFrKey()) === '1'; } catch (e) { /* nada */ }
+    if (known) listenInvites();
+  }
+
+  /** Carga la lista de amigos (y la sigue escuchando) la primera vez que hace falta. */
+  let friendsReady = null;
+  function ensureFriends() {
+    if (!fb || !me) return Promise.resolve();
+    if (!friendsReady) friendsReady = new Promise(res => listenFriends(res));
+    return friendsReady;
   }
 
   /** Invitaciones a salas: sólo te pueden llegar de amigos, así que sin amigos no se escucha (lecturas). */
@@ -153,26 +167,21 @@ G.SocialCloud = (() => {
   let playing = false, lastBeat = 0;
   /** ¿Hay alguien que pueda leer tu "en línea"? (sólo los amigos confirmados) */
   const hasFriends = () => [...friends.values()].some(f => f.status === 'ok');
-  function writeStatus(on = true) {
-    // Sin amigos nadie lo lee: no se gasta una escritura (cupo diario de Firebase).
-    if (!fb || !me || !hasFriends()) return;
-    lastBeat = Date.now();
-    fb.fs.collection('pres').doc(uid).set({ on, at: fts(), room: room ? room.id : '', play: playing }).catch(() => {});
-  }
-  function setPlaying(p) { if (playing !== !!p) { playing = !!p; writeStatus(); } }
-  // Al volver a la pestaña tras un rato, un latido; al cerrarla, "desconectado".
-  function onVisible() { if (document.visibilityState === 'visible' && Date.now() - lastBeat > BEAT) writeStatus(); }
-  function onHide() { writeStatus(false); }
+  // El "en línea" de los amigos se quitó el 20-10-2026: era 1/4 de todas las
+  // escrituras de Firestore (unas 2 millones al día). Ya no se escribe ni se lee
+  // pres/{uid}; se puede invitar a cualquier amigo (la invitación caduca sola).
+  // writeStatus y refreshPresence se quedan vacías para no tocar a quien las llama.
+  const presKey = () => 'ps.pres.' + uid;
+  function writeStatus() {}
+  function setPlaying(p) { playing = !!p; }
 
   async function stop(why) {
     if (!started) return;
     await leaveRoom().catch(() => {});
     if (unFriends) { unFriends(); unFriends = null; }
     if (unInv) { unInv(); unInv = null; }
-    clearInterval(beatT); beatT = 0;
-    document.removeEventListener('visibilitychange', onVisible);
-    window.removeEventListener('pagehide', onHide);
-    if (me) await fb.fs.collection('pres').doc(uid).delete().catch(() => {});
+    clearInterval(beatT); beatT = 0; friendsReady = null;
+    try { localStorage.removeItem(presKey()); } catch (e) { /* nada */ }
     if (why === 'delete') {
       try { localStorage.removeItem('ps.nick.' + uid); } catch (e) { /* nada */ }
       await deleteAll().catch(e => console.warn('[Social] borrar:', e));
@@ -192,6 +201,7 @@ G.SocialCloud = (() => {
     await step('invitaciones', () => del(fb.fs.collection('inv').where('to', '==', uid)));
     await step('marcas', () => del(fb.fs.collectionGroup('e').where('uids', 'array-contains', uid)));
     await step('partida en curso', () => fb.fs.collection('runs').doc(uid).delete());
+    await step('en línea', () => fb.fs.collection('pres').doc(uid).delete());
     await step('apodo', async () => {
       const prof = await fb.fs.collection('profiles').doc(uid).get();
       const lower = prof.exists ? prof.data().lower : me && me.name.toLowerCase();
@@ -202,7 +212,7 @@ G.SocialCloud = (() => {
 
   // ---------------- amigos ----------------
 
-  function listenFriends() {
+  function listenFriends(ready) {
     unFriends = fb.fs.collection('friendships').where('users', 'array-contains', uid).onSnapshot(snap => {
       const next = new Map();
       snap.forEach(d => {
@@ -214,41 +224,17 @@ G.SocialCloud = (() => {
           online: false, play: false, room: '', seen: 0
         }, pres.get(other) || {}));
       });
-      // Un amigo nuevo (o recién aceptado): se mira si está en línea.
-      const added = [...next.values()].some(f => f.status === 'ok' && (!friends.has(f.uid) || friends.get(f.uid).status !== 'ok'));
-      const hadFriends = hasFriends();
       friends = next;
       emit('friends');
-      // Tu primer amigo: ahora sí hay quien lea tu "en línea" y quien te invite.
-      if (!hadFriends && hasFriends()) writeStatus();
+      // Con amigos ya te pueden invitar (y este navegador lo recuerda para la próxima vez).
+      try { if (hasFriends()) localStorage.setItem(hasFrKey(), '1'); else localStorage.removeItem(hasFrKey()); } catch (e) { /* nada */ }
       if (hasFriends()) listenInvites();
-      // Se mira si está en línea un momento después: tu amigo también acaba de
-      // recibir la amistad y está apuntando su "en línea" a la vez.
-      if (added) setTimeout(() => { if (started) refreshPresence(true); }, 2500);
-    }, e => console.warn('[Social] amigos:', e.code || e.message));
+      if (ready) { ready(); ready = null; }
+    }, e => { console.warn('[Social] amigos:', e.code || e.message); if (ready) { ready(); ready = null; } });
   }
 
-  /**
-   * Lee el "en línea" de tus amigos (1 lectura por amigo). Sólo se llama al
-   * abrir Amigos o la sala, y lo leído vale 1 min.
-   */
-  async function refreshPresence(force = false) {
-    if (!fb || (!force && Date.now() - presAt < PRES_TTL)) return;
-    presAt = Date.now();
-    const ok = [...friends.values()].filter(f => f.status === 'ok');
-    const docs = await Promise.all(ok.map(f => fb.fs.collection('pres').doc(f.uid).get().catch(() => null)));
-    const t = now();
-    ok.forEach((f, i) => {
-      const v = docs[i] && docs[i].exists ? docs[i].data() : null;
-      const on = !!(v && v.on && t - msOf(v.at) < ONLINE);
-      const p = { online: on, play: !!(on && v.play), room: on ? v.room : '', seen: v ? msOf(v.at) : 0 };
-      pres.set(f.uid, p);
-      // La lista de amigos puede haberse renovado mientras se leía: se aplica a la actual.
-      const cur = friends.get(f.uid);
-      if (cur) Object.assign(cur, p);
-    });
-    emit('presence');
-  }
+  /** (Quitado el 20-10-2026 con el "en línea": ya no lee nada.) */
+  async function refreshPresence() {}
 
   /** Envía una solicitud de amistad (o acepta la que ya te había mandado). */
   async function request(name) {
@@ -504,6 +490,18 @@ G.SocialCloud = (() => {
     }, 800);
   }
 
+  /** El perfil de otro jugador, limpio (ver G.U.int / str): sólo lo que el juego sabe pintar. */
+  function cleanProfile(d) {
+    const U = G.U, b = d.best || {};
+    return {
+      name: U.str(d.name, 24), title: U.str(d.title, 40),
+      favs: U.list(d.favs, 3).filter(f => f && G.DEX_BY[U.int(f.dex)]).map(f => ({ dex: U.int(f.dex), shiny: f.shiny === true })),
+      best: { solo: U.int(b.solo, 86400), group: U.int(b.group, 86400), level: U.int(b.level, 999), bosses: U.int(b.bosses, 1e9),
+              legends: U.int(b.legends, 999), kills: U.int(b.kills, 1e12), medals: U.int(b.medals, 999) },
+      medals: U.list(d.medals, 8).map(x => U.str(x, 40))
+    };
+  }
+
   /** El perfil público de otro jugador. */
   const profCache = new Map();
   async function getProfile(other) {
@@ -513,7 +511,7 @@ G.SocialCloud = (() => {
     const c = profCache.get(other);
     if (c && Date.now() - c.at < 10 * 60 * 1000) return c.v;     // lo leído vale 10 min
     const d = await fb.fs.collection('profiles').doc(other).get().catch(() => null);
-    const v = d && d.exists ? d.data() : null;
+    const v = d && d.exists ? cleanProfile(d.data()) : null;
     profCache.set(other, { at: Date.now(), v });
     return v;
   }
@@ -523,7 +521,7 @@ G.SocialCloud = (() => {
 
   return {
     start, stop, claimNick, request, accept, remove, publishProfile, getProfile, profileData,
-    createRoom, joinRoom, leaveRoom, setOpen, refreshMember, setPlaying, refreshPresence,
+    createRoom, joinRoom, leaveRoom, setOpen, refreshMember, setPlaying, refreshPresence, ensureFriends,
     invite, acceptInvite, declineInvite,
     on(fn) { listeners.add(fn); }, off(fn) { listeners.delete(fn); },
     get me() { return me; },
@@ -556,6 +554,8 @@ G.Social = (() => {
   for (const g of ['me', 'started', 'friends', 'invites', 'room', 'uid']) Object.defineProperty(o, g, { get: () => impl()[g] });
   o.VALID = G.SocialCloud.VALID;
   Object.defineProperty(o, 'MAX_PLAYERS', { get: () => impl().MAX_PLAYERS });
+  // Lista de amigos: la nube la lee al abrir Amigos, la sala o el ranking; el servidor ya la tiene.
+  o.ensureFriends = () => (impl().ensureFriends ? impl().ensureFriends() : Promise.resolve());
   o.block = (...a) => (impl().block ? impl().block(...a) : Promise.resolve({ ok: false, error: 'Sólo en la red local.' }));
   Object.defineProperty(o, 'blocked', { get: () => impl().blocked || [] });
   // Lista de salas: sólo la tiene el servidor de red local.
