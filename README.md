@@ -1,183 +1,148 @@
-# PokéSurvivor · Mundo Misterioso
+# TopPath Survivor
 
-Bullet-heaven con Pokémon al estilo de Survivor.io y Megabonk, con sprites de
-*Pokémon Mundo Misterioso*, capa roguelike, **966 Pokémon de las 9 generaciones**,
-shinies y gacha por región. Música y efectos compuestos para el juego.
+以寶可夢為主角的「割草」生存遊戲（類似 Survivor.io、Megabonk），使用
+*寶可夢不可思議的迷宮* 的像素圖，加上 roguelike 元素、**9 個世代共 966 隻寶可夢**、
+閃光寶可夢和各地區的扭蛋。音樂與音效都是為這個遊戲製作的。
 
-HTML + CSS + JavaScript vanilla sobre Canvas 2D. Sin build, sin dependencias y
-**todo local**: no necesita internet para jugar.
+純 HTML + CSS + JavaScript（Canvas 2D），沒有任何相依套件。
 
-> **Autoría / Authorship**
+這個版本是 [JPTER78/pokesurvivor](https://github.com/JPTER78/pokesurvivor)
+的**區網分支**：可以架在一台電腦上（或用 Docker），讓同一個網路裡的人一起玩，
+不需要網際網路，也不用 Firebase。
+
+> **原作者**
 >
-> PokéSurvivor (su código y su música original) lo ha escrito y es de
-> **Jonathan Piera Torregrosa**, dueño de esta cuenta (JPTER78) y de pokesurvivor.com.
-> The source code and original music of PokéSurvivor are written and owned by
-> **Jonathan Piera Torregrosa**, owner of this GitHub account (JPTER78) and of
-> pokesurvivor.com. Google copyright removal request **4-2352000042234**
-> (against pokesurvivor.co) was submitted by me.
+> 原作 PokéSurvivor（程式碼與原創音樂）由 **Jonathan Piera Torregrosa**
+> （GitHub 帳號 JPTER78）撰寫並擁有。這個 repo 是根據原作修改的非官方版本，
+> 與原作者無關；原作的官方網站是 [pokesurvivor.com](https://pokesurvivor.com)。
 
-> **Aviso sobre criptomonedas / Crypto disclaimer**
+> **關於加密貨幣**
 >
-> PokéSurvivor **no tiene ninguna criptomoneda, token ni NFT oficial**, y yo no
-> he creado ninguno. Cualquier token que use el nombre del juego lo han creado
-> terceros. **No me hago cargo de ninguna compra, venta o inversión** que hagas
-> con ellos y nada de lo que hay aquí es una recomendación de inversión. El
-> juego es gratis y lo seguirá siendo.
->
-> PokéSurvivor has **no official cryptocurrency, token or NFT**, and I have not
-> created any. Any token using the game's name was created by third parties.
-> **I take no responsibility for any purchase, sale or investment** you make
-> with them, and nothing here is investment advice. The game is free and will
-> stay free.
+> 本遊戲**沒有任何官方的加密貨幣、代幣或 NFT**。任何使用遊戲名稱的代幣都是
+> 第三方建立的，與本專案無關，這裡的內容也不構成任何投資建議。遊戲免費，而且會一直免費。
 
-## Jugar
+## 這個版本多了什麼
 
-Doble clic en `index.html`. Crea una cuenta o entra como invitado, haz el test
-de personalidad y a la mazmorra.
+- **區網伺服器**（`server/`）：帳號、存檔、排行榜都存在架伺服器的那台電腦上，
+  網路裡的任何裝置用名稱和密碼登入即可。
+- **多人最多 8 人**（線上版是 4 人）；超過 4 人時同時出現的敵人更多（8 人最多 128 隻）。
+- **對抗模式**：最多 3 隊、每隊 3 人，各隊分開升級、計算擊倒數，也可以攻擊其他隊。
+- **斷線重連**：多人遊戲中重新整理頁面或瀏覽器關掉，可以從「多人遊戲」回到原本的對戰。
+- **好友度**：同一隻寶可夢每玩 10 場（2 分鐘以上）得 1 點，最多 100 點，會稍微提高血量、攻擊和速度。
+- **區網好友**：伺服器上的所有玩家自動互為好友，有搜尋和黑名單。
+- **自訂角色**：「彩骰」卡池的 6 位魔法師（Glacius、Floria、Amora、Ignis、Dulcín、Voltio）和 Belle。
+- **語言**：英文和繁體中文（在「設定」中切換）。
 
-| Tecla | Acción |
+## 開始玩
+
+### 用 Docker（建議）
+
+```
+docker compose up -d        # 啟動（背景執行）
+docker compose logs -f      # 看 log
+docker compose down         # 停止
+```
+
+然後用瀏覽器打開 `http://<這台電腦的 IP>:8877`。
+
+- 玩家資料存在 volume `pokesurvivor_pokesurvivor-data`，重建或更新都不會清掉。
+- **熱更新**：`docker-compose.yml` 直接把這個資料夾掛進容器，伺服器每次都從磁碟讀檔。
+  改完遊戲後在電腦上 build（見下方「發布新版本」），玩家 5 分鐘內就會自動換到新版本，
+  不用重建映像。只有改了 `server/*.js` 才需要 `docker compose restart`。
+
+### 直接用 Node
+
+需要 Node 18 以上，不用安裝任何套件：
+
+```
+node server/server.js                         # http://<伺服器IP>:8877
+PORT=3000 node server/server.js               # 換連接埠
+node server/server.js --list                  # 列出帳號
+node server/server.js --reset 名稱 新密碼       # 幫忘記密碼的玩家重設
+```
+
+詳細步驟見 [server/README.md](server/README.md) 與 [docs/部署到區網.md](docs/部署到區網.md)。
+
+### 操作
+
+| 按鍵 | 動作 |
 |---|---|
-| `W` `A` `S` `D` / flechas | Moverse |
-| `1` `2` `3` `4` | Elegir el movimiento activo |
-| `Q` / `E` | Ciclar movimientos |
-| `Esc` / `P` | Pausa |
+| `W` `A` `S` `D` / 方向鍵 | 移動 |
+| `1` `2` `3` `4` | 選擇使用中的招式 |
+| `Q` / `E` | 切換招式 |
+| `Esc` / `P` | 暫停 |
 
-**En móvil o tablet** (en horizontal): pon el dedo en cualquier sitio y arrastra
-para moverte (el joystick aparece donde tocas), toca un ataque de abajo para
-cambiarlo y el botón de arriba a la derecha para pausar. Se puede instalar como
-app ("Añadir a pantalla de inicio"). En **Ajustes** hay sonido, calidad gráfica
-(con modo automático), números de daño, menos sacudidas, FPS y la cuenta.
+**手機或平板**（橫向）：手指放在任何地方拖曳就能移動（搖桿會出現在按的位置），
+點下方的招式切換，右上角的按鈕暫停。可以「加入主畫面」當成 App 使用。
+也支援遊戲手把。
 
-El Pokémon ataca solo con el movimiento activo (o con todos los de un
-**vínculo**: cada legendario vencido deja fusionar movimientos para lanzarlos a
-la vez desde un solo hueco, hasta 4). Las rocas, cofres y la hierba
-alta se rompen; las paredes y los árboles bloquean los disparos enemigos; el
-agua frena y la lava quema (también a los enemigos).
+## 遊戲內容
 
-En el mapa hay **altares de poder**, **manantiales** que curan, **cofres con
-candado** (quédate a su lado unos segundos) y **trampas** que también dañan a
-los enemigos. A veces se abre una **grieta**: entra y lucharás contra un
-**legendario** en una arena aparte.
+- 寶可夢會自動用使用中的招式攻擊。擊敗傳說寶可夢後可以把招式**連結**，從同一格一起施放（最多 4 個）。
+- 有**屬性相剋**和**天氣**（晴天、下雨、沙暴、下雪、起霧），會強化或削弱某些屬性。
+- 招式分**物理**和**特殊**，對應寶可夢的攻擊／特攻和敵人的防禦／特防。
+- 地圖上有**力量祭壇**、可以回血的**泉水**、**上鎖的寶箱**和**陷阱**；偶爾會出現**裂縫**，進去可以和傳說寶可夢單挑。
+- 每天和每週都有**任務**可以拿扭蛋券和金幣；**成就**會給獎章和稱號。
+- 每隻寶可夢的**強化**是分開的；**扭蛋**用遊玩獲得的扭蛋券來抽。
+- 每隻敵人有 1/4096 的機率是**閃光**的，擊敗就能得到；扭蛋每 100 抽出 1 隻閃光。
+- 招式升到最高等級會**進化**；可以花錢解鎖每隻寶可夢的**初始招式**。
 
-Hay **tabla de tipos** (un Rayo Burbuja le quita más a un Charmander) y,
-de vez en cuando, **climas** (sol, lluvia, arena, nieve, niebla) que potencian
-unos tipos y debilitan otros.
+## 發布新版本
 
-Cada día hay **misiones** (y semanales) que dan tickets y monedas; los
-**logros** dan medallas y títulos, y tu **perfil** enseña tus 3 Pokémon
-favoritos, tus marcas y tus medallas. En las runs encuentras **objetos** (Restos,
-Cinta Elección...) y tus movimientos **evolucionan** al máximo nivel. Los
-enemigos tienen personalidad: curan, ponen escudos, llaman a su manada o atacan
-con aviso en el suelo.
+1. 只修改 `dev.html`（`index.html` 是自動產生的）。
+2. 執行：
 
-Las **mejoras** son de cada Pokémon. El **gacha** va con **tickets** que se
-ganan jugando (×1 de algunos Pokémon, ×10 de jefes y legendarios), y se tira
-en una tragaperras pixel art.
+   ```
+   node tools/build.js && node tools/export_data.js && python tools/make_seo_pages.py
+   ```
 
-Cada enemigo tiene 1/4096 de salir **shiny**: brilla, una flecha en el borde de
-la pantalla te dice dónde está, y si lo derrotas te lo quedas. En el gacha sale
-shiny 1 de cada 100 tiradas. En la colección eliges tu compañero en versión
-normal o shiny.
+   `build.js` 會產生 `index.html`、`js/app.min.js` 和 `version.json`。
+3. 遊戲每 5 分鐘檢查一次 `version.json`：不在對戰中的玩家會在 5 秒提示後重新載入；
+   對戰中的玩家等那場結束、回到選單後才會更新，不會損失任何進度。
+4. 每項遊戲變更都要寫進 `js/data/changelog.js`（西班牙文和英文），
+   中文翻譯加在 `js/data/lang-zh.js`。
 
-La música suena tras el primer clic (los navegadores no dejan reproducir sonido
-antes). Volumen y silencio: botón del altavoz arriba a la derecha, o en la pausa.
+## 翻譯
 
-El guardado vive en el `localStorage` del navegador: si borras los datos del
-sitio, se pierde.
+遊戲本身以西班牙文撰寫，畫面上的文字用字典翻譯：
 
-En `videos/` hay grabaciones del juego (con su música): un combate contra un
-jefe, la captura de un shiny salvaje y un shiny en el gacha.
+- 英文：`js/data/lang-en.js`
+- 繁體中文：`js/data/lang-zh.js`（優先），缺的部分由 `lang-zh-hant.js` 補上；
+  `tools/build_langs.js` 會把它們合併成 `js/lang/zh-Hant.js`。
+- 檢查還缺哪些翻譯：`node tools/build_langs.js --faltan`
 
-## Guardado en la nube y publicación
-
-- **Base de datos (Firebase):** cuentas con nombre + contraseña o Google, y la
-  partida se sigue en cualquier ordenador. Pasos en [docs/FIREBASE.md](docs/FIREBASE.md).
-  Sin configurar, el juego guarda sólo en el navegador, como antes.
-- **Jugar con amigos (hasta 4) y ranking:** con cuenta en la nube, menú
-  **Amigos** (añadir por apodo, invitar a tu sala) y **Ranking** (tiempo
-  aguantado: solo o grupo, de hoy a histórico, amigos, por Pokémon).
-- **Publicar gratis en GitHub Pages:** [docs/PUBLICAR.md](docs/PUBLICAR.md).
-- Si se juega en dos ordenadores a la vez o sin conexión, las partidas se
-  **fusionan**: las colecciones se unen (nunca se pierde un Pokémon ni un
-  shiny), mejoras y estadísticas se quedan con el máximo, y monedas y
-  compañero con la versión más reciente. Los cambios de otro ordenador llegan
-  en directo.
-
-## Licencia
-
-Código bajo [PolyForm Noncommercial 1.0.0](LICENSE-NONCOMMERCIAL.md) desde el
-14-10-2026: se puede usar, estudiar y modificar, pero **no con fines
-comerciales** (ni vender el juego ni cobrar nada dentro de él). Las versiones
-hasta el commit `b297089` se publicaron bajo MIT. Los sprites (CC BY-NC 4.0),
-la fuente (OFL) y las marcas de Pokémon tienen sus propias condiciones: ver
-[LICENSE](LICENSE) y [CREDITS.md](CREDITS.md). Proyecto de fan sin ánimo de
-lucro.
-
-**La única web oficial es [pokesurvivor.com](https://pokesurvivor.com).** El
-juego es y será gratis: si alguien te pide pagar, no somos nosotros.
-
-## Estructura
+## 測試
 
 ```
-index.html              pantallas + orden de carga
-css/style.css           interfaz estilo Mundo Misterioso
-assets/pokemon/{dex}/   hojas de sprites PMD (Idle, Walk, Attack, Shoot, Charge, Hurt, Faint)
-assets/pokemon/{dex}/s/ las mismas en versión shiny
-assets/fonts/           Pixelify Sans (OFL) y su versión con números redibujados (tools/make_font.py)
+node --test tests/i18n.test.cjs tests/net.test.cjs
+```
+
+## 資料夾結構
+
+```
+dev.html                畫面與載入順序（build 後產生 index.html）
+css/style.css           介面樣式
+assets/pokemon/{dex}/   PMD 格式的動畫圖（Idle、Walk、Attack、Shoot……）
+assets/pokemon/{dex}/s/ 閃光版本
+server/                 區網伺服器（帳號、存檔、排行榜、房間、多人中繼）
 js/
-  net/      social (apodo, amigos, salas), net (WebRTC + relé),
-            coop (partida en grupo), ranking
-  core/     util, db (guardado), audio (sintetizador + efectos), input,
-            sprites (animador PMD), camera
-  data/     pokedex*, sprites-meta*, moves, starters (+ test), enemies,
-            upgrades, music (partituras)
-  world/    tiles (pixel art en código), world (terreno, objetos, colisiones)
-  entities/ player, enemy, projectile, pickup, fx
-  systems/  combat, spawner, levelup, gacha
-  ui/       icons (pixel art), ui, hud, login, test, menu, gacha-ui, run-ui,
-            social-ui, ranking-ui
-  game.js   flujo y bucle principal
-tools/      scripts que regeneran los ficheros marcados con *
+  core/     util、db（存檔）、audio、input、sprites、i18n、locales
+  data/     pokedex*、sprites-meta*、custom（自訂角色）、moves、enemies、lang-*
+  world/    地圖與地形
+  entities/ 玩家、敵人、投射物、道具、特效
+  systems/  戰鬥、敵人生成、升級、扭蛋、裂縫……
+  net/      好友與房間（雲端／區網）、WebRTC、多人同步、排行榜
+  ui/       各個畫面
+  game.js   主流程與主迴圈
+tools/      建置與重新產生資料（標 * 的檔案）的腳本
 ```
 
-`*` = generado. Para rehacerlos (necesita Python 3 + Pillow e internet, sólo esa vez):
+## 授權與致謝
 
-```
-python tools/fetch_sprites.py    # sprites normal y shiny + js/data/sprites-meta.js
-                                 # (~20 min; se puede cortar y relanzar: usa tools/cache/)
-python tools/fetch_pokedex.py    # js/data/pokedex.js
-python tools/fetch_credits.py    # CREDITS.md
-```
-
-## Notas de implementación
-
-- **Sprites PMD.** Columnas = fotogramas, filas = 8 direcciones (Down, DownRight,
-  Right, UpRight, Up, UpLeft, Left, DownLeft — verificado con los `-Offsets.png`).
-  Cada animación tiene su propio tamaño de fotograma, así que se alinean por el
-  **ancla al suelo** sacada del `-Shadow.png`; sin eso el sprite saltaría al atacar.
-- **Coordenadas.** `(x, y)` de una entidad son sus **pies**. Las colisiones
-  ocurren en el plano del suelo; los proyectiles vuelan en ese plano y se dibujan
-  elevados con su sombra debajo.
-- **Mundo.** Chunks de 16×16 tiles: los *datos* (terreno, objetos) son baratos y
-  se generan siempre; la *imagen* se hornea a resolución de arte escribiendo en un
-  `ImageData` (~4 ms por chunk en Chrome) y sólo para los visibles.
-- **Rendimiento.** Rejilla espacial de enemigos reconstruida cada frame. Con 420
-  enemigos, simulación + render completo ≈ 3 ms por frame en Chrome.
-- **Metadatos en `.js`, no `.json`**, porque `fetch()` está bloqueado en `file://`.
-- **Shiny.** Los shiny de SpriteCollab son el mismo dibujo con otra paleta; están
-  en `s/` y sólo 30 tienen geometría distinta (campo `sa` en los metadatos).
-  Las hojas se guardan como PNG con paleta exacta: misma imagen, la mitad de peso.
-- **Audio.** Sintetizador Web Audio con planificador anticipado (programa las
-  notas 150 ms por delante) y reverb por convolución con un impulso generado.
-  Las partituras están en `js/data/music.js` en un formato de texto propio.
-  Los efectos tienen separación mínima entre repeticiones y un tope de voces,
-  para que 400 enemigos golpeados a la vez no saturen.
-- **Iconos.** Mapas de caracteres convertidos a canvas y data URLs; siempre a
-  múltiplos enteros de su tamaño para que el píxel quede limpio.
-
-## Créditos y licencia
-
-Sprites de [SpriteCollab](https://github.com/PMDCollab/SpriteCollab) bajo
-**CC BY-NC 4.0** — uso **no comercial** y con atribución; la lista de artistas
-está en [`CREDITS.md`](CREDITS.md). Pokémon es propiedad de Nintendo, Creatures
-Inc. y GAME FREAK. Proyecto de fan sin ánimo de lucro.
+- 程式碼採用 [PolyForm Noncommercial 1.0.0](LICENSE-NONCOMMERCIAL.md)（原作自
+  2026-10-14 起的授權）：可以使用、研究、修改，但**不得用於商業用途**。
+  原作在 commit `b297089` 以前的版本採用 MIT。詳見 [LICENSE](LICENSE)。
+- 寶可夢圖片來自 [SpriteCollab](https://github.com/PMDCollab/SpriteCollab)，採用
+  **CC BY-NC 4.0**（非商業、須標示作者），作者名單見 [CREDITS.md](CREDITS.md)。
+- 字型 Pixelify Sans 採用 OFL 授權。
+- 寶可夢為 Nintendo、Creatures Inc. 與 GAME FREAK 所有。這是非營利的粉絲專案。
