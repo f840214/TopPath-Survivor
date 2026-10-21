@@ -3740,5 +3740,7 @@ G.I18n.add({
   'Nuevo personaje: Belle (Veneno/Agua), Legendaria del banner de Kanto. Tiene su propio repertorio de 8 movimientos (empieza con Picotazo Veneno) y no sale como salvaje ni como jefe.': '新角色：Belle（毒／水），關都卡池的傳說角色。擁有專屬的 8 種招式（初始為毒針），不會以野生或首領的身分出現。',
   'Inglés y chino, y lo nuevo de la versión oficial': '英文與中文，以及官方版的新內容',
   'El juego está en inglés y en chino tradicional (se elige en Ajustes). El español ya no se ofrece.': '遊戲提供英文與繁體中文（在「設定」中選擇），不再提供西班牙文。',
-  'Llega todo lo nuevo de la versión oficial hasta el 20 de octubre (38 ataques nuevos, Movimiento inicial, colección con buscador y favoritos, cooperativo más seguro...), sin perder nada de la red local.': '加入官方版截至 10 月 20 日的所有新內容（38 種新招式、初始招式、可搜尋和加入最愛的圖鑑、更安全的合作模式……），區網版的功能全部保留。'
+  'Llega todo lo nuevo de la versión oficial hasta el 20 de octubre (38 ataques nuevos, Movimiento inicial, colección con buscador y favoritos, cooperativo más seguro...), sin perder nada de la red local.': '加入官方版截至 10 月 20 日的所有新內容（38 種新招式、初始招式、可搜尋和加入最愛的圖鑑、更安全的合作模式……），區網版的功能全部保留。',
+  'Colección: al tocar a Belle o a un mago del Dado Arcoíris ya se abre su ficha (se quedaba la del Pokémon de antes). Ahora tienen también Ataque, At. Esp., Defensa y Def. Esp.': '圖鑑：點選 Belle 或彩骰的魔法師時，現在會正確打開他們的資料（之前會停留在上一隻寶可夢）。他們現在也有攻擊、特攻、防禦和特防數值。',
+  'El título del juego es ahora TopPath Survivor, y ya no sale la frase de broma bajo el título.': '遊戲標題改為 TopPath Survivor，標題下方的玩笑標語也拿掉了。'
 }, 'zh-Hant');
