@@ -11,23 +11,19 @@ G.Input = (() => {
 
   function code(e) { return (e.code || e.key).toLowerCase(); }
 
-  // Sólo cuenta lo que viene del teclado y el ratón de verdad: las pulsaciones
-  // que se inventa un script de la página (dispatchEvent) llegan con
-  // isTrusted = false y no mueven ni atacan (antitrampas, 21-10-2026).
   addEventListener('keydown', e => {
-    if (!e.isTrusted) return;
     const c = code(e);
     if (!down.has(c)) pressed.add(c);
     down.add(c);
     // Evita que el navegador haga scroll con flechas/espacio durante el juego.
     if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'space', 'tab'].includes(c)) e.preventDefault();
   });
-  addEventListener('keyup', e => { if (e.isTrusted) down.delete(code(e)); });
+  addEventListener('keyup', e => down.delete(code(e)));
   addEventListener('blur', () => { down.clear(); });
   let movedAt = 0;               // última vez que se movió el ratón (apuntado a mano)
-  addEventListener('mousemove', e => { if (!e.isTrusted) return; mx = e.clientX; my = e.clientY; movedAt = performance.now(); });
-  addEventListener('mousedown', e => { if (e.isTrusted) mdown = true; });
-  addEventListener('mouseup', e => { if (e.isTrusted) mdown = false; });
+  addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; movedAt = performance.now(); });
+  addEventListener('mousedown', () => mdown = true);
+  addEventListener('mouseup', () => mdown = false);
 
   return {
     /** Vector de movimiento del jugador (teclado, joystick táctil o mando). */

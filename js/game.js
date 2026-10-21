@@ -445,14 +445,11 @@ G.Game = (() => {
    *   - funciones de tu Pokémon sustituidas (así se hace uno invencible)
    *   - vida, ataque, velocidad o recarga muy por encima de lo posible
    *   - se han usado las funciones de pruebas (saltar el reloj...)
-   *   - el navegador lo maneja un programa (Selenium, Playwright...: navigator.webdriver),
-   *     como hacen los bots y las IA que juegan solas (21-10-2026)
    * Si algo salta, esa partida no sube al ranking (sin avisar) y nada más.
    */
   let runReal = 0, tampered = false;
   function clean() {
     if (tampered) return false;
-    if (navigator.webdriver) return false;
     if (time > (performance.now() - runReal) / 1000 + 10) return false;
     for (const k of ['hurt', 'update', 'heal', 'gainXp']) if (Object.prototype.hasOwnProperty.call(pl, k)) return false;
     if (!isFinite(pl.hp) || !isFinite(pl.maxHp) || pl.hp > pl.maxHp + 1 || pl.maxHp > 50000) return false;

@@ -31,12 +31,10 @@ G.Touch = (() => {
   function init(canvas) {
     cv = canvas;
     if (active) document.body.classList.add('touch');
-    // (Sólo toques de verdad: los inventados por un script, isTrusted = false, no cuentan.)
-    const real = fn => e => { if (e.isTrusted) fn(e); };
-    cv.addEventListener('pointerdown', real(down));
-    cv.addEventListener('pointermove', real(move));
-    cv.addEventListener('pointerup', real(up));
-    cv.addEventListener('pointercancel', real(up));
+    cv.addEventListener('pointerdown', down);
+    cv.addEventListener('pointermove', move);
+    cv.addEventListener('pointerup', up);
+    cv.addEventListener('pointercancel', up);
     cv.addEventListener('contextmenu', e => e.preventDefault());
     // iPhone: la pulsación larga sobre el juego abría la lupa y el menú de
     // "Copiar / Seleccionar todo". Cortar el toque aquí lo evita (los eventos
@@ -46,7 +44,6 @@ G.Touch = (() => {
     // un segundo dedo con el otro en el joystick y no se podía cambiar de movimiento.
     cv.addEventListener('touchstart', e => {
       if (e.cancelable) e.preventDefault();
-      if (!e.isTrusted) return;
       if (!active) { active = true; document.body.classList.add('touch'); }
       for (const t of e.changedTouches) { const b = hit(t.clientX, t.clientY); if (b) press(b); }
     }, { passive: false });
