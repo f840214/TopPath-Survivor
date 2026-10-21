@@ -11,8 +11,8 @@ G.CHANGELOG = [
      'The game is in English and Traditional Chinese (pick it in Settings). Spanish is no longer offered.'],
     ['Llega todo lo nuevo de la versión oficial hasta el 20 de octubre (38 ataques nuevos, Movimiento inicial, colección con buscador y favoritos, cooperativo más seguro...), sin perder nada de la red local.',
      'Everything new in the official version up to 20 October is here (38 new moves, Starting move, a collection with search and favourites, safer co-op...), keeping everything from the local network.'],
-    ['El título del juego es ahora TopPath Survivor, y ya no sale la frase de broma bajo el título.',
-     'The game title is now TopPath Survivor, and the joke line under the title is gone.']
+    ['El título del juego es ahora TopPath Survivor, en azul, y ya no sale la frase de broma bajo el título.',
+     'The game title is now TopPath Survivor, in blue, and the joke line under the title is gone.']
   ], fix: [
     ['Colección: al tocar a Belle o a un mago del Dado Arcoíris ya se abre su ficha (se quedaba la del Pokémon de antes). Ahora tienen también Ataque, At. Esp., Defensa y Def. Esp.',
      'Collection: tapping Belle or a Rainbow Dice mage now opens their page (the previous Pokémon stayed on screen). They now also have Attack, Sp. Atk, Defense and Sp. Def.']

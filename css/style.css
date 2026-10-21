@@ -26,6 +26,8 @@
   --edge-out: #0b1838;
   --gold: #ffd23f;
   --gold2: #f0a31e;
+  --title: #5fc8ff;        /* el título del juego (TopPath Survivor), en azul */
+  --title-sh: #1d5fa8;
   --red: #ff5f6d;
   --green: #5fe08a;
   --shadow: #0a1430;
@@ -164,8 +166,8 @@ label { display: block; font-size: 14px; color: var(--muted); margin: 8px 0 4px;
 
 /* ---------- pantalla de inicio ---------- */
 .logo { text-align: center; margin-bottom: 18px; }
-.logo .t1 { font-size: 46px; font-weight: 700; line-height: 1; color: var(--gold);
-  text-shadow: 3px 3px 0 #a55f00, 6px 6px 0 var(--shadow); letter-spacing: 1px; }
+.logo .t1 { font-size: 46px; font-weight: 700; line-height: 1; color: var(--title);
+  text-shadow: 3px 3px 0 var(--title-sh), 6px 6px 0 var(--shadow); letter-spacing: 1px; }
 .logo .t2 { font-size: 18px; color: #fff; margin-top: 6px; letter-spacing: 3px; text-transform: uppercase; }
 
 /* ---------- test de personalidad ---------- */
@@ -771,7 +773,7 @@ body.touch kbd, body.touch .card .key, body.touch .kbd-hint { display: none !imp
 .pad-focus { outline: 3px solid #ffd23f !important; outline-offset: 3px; box-shadow: 0 0 0 6px rgba(255,210,63,.25) !important; }
 .credits { margin: 4px 0 12px; padding-left: 18px; color: var(--muted); font-size: 14px; line-height: 1.6; }
 .credits b { color: var(--ink); }
-.about-logo { text-align: center; font-size: 34px; font-weight: 700; color: var(--gold); text-shadow: 2px 2px 0 #a55f00, 4px 4px 0 var(--shadow); margin-top: 6px; }
+.about-logo { text-align: center; font-size: 34px; font-weight: 700; color: var(--title); text-shadow: 2px 2px 0 var(--title-sh), 4px 4px 0 var(--shadow); margin-top: 6px; }
 .btn.danger { background: #8a1f2e; border-color: #ff8a96; }
 .row.wrap { flex-wrap: wrap; }
 .touch-hint { display: none; }
@@ -837,7 +839,7 @@ a.btn { text-decoration: none; display: inline-block; color: var(--ink); }
 
 /* ---------- pantalla de carga (lo primero que se ve y lo que lee Google) ---------- */
 .boot-in { text-align: center; padding: 20px; max-width: 640px; }
-.boot-in h1 { margin: 0 0 8px; font-size: clamp(38px, 8vw, 64px); color: var(--gold); text-shadow: 3px 3px 0 #a55f00, 6px 6px 0 var(--shadow); font-weight: 700; }
+.boot-in h1 { margin: 0 0 8px; font-size: clamp(38px, 8vw, 64px); color: var(--title); text-shadow: 3px 3px 0 var(--title-sh), 6px 6px 0 var(--shadow); font-weight: 700; }
 .boot-in p { margin: 6px 0; color: var(--muted); }
 .boot-in a { color: #9fd4ff; }
 .boot-ld { color: #fff; margin-top: 18px !important; }

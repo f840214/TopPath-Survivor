@@ -1,3 +1,6 @@
+# 專案名稱固定：資料夾改名（TopPath Survivor）後，玩家資料的 volume 還是同一個
+# （pokesurvivor_pokesurvivor-data），不會變成一個空的新 volume。
+name: pokesurvivor
 services:
   pokesurvivor:
     build: .
@@ -5,6 +8,10 @@ services:
     ports:
       - "8877:8877"          # 左邊改成想對外開的埠
     volumes:
+      # 熱更新：遊戲檔案直接用這個資料夾（伺服器每次都從磁碟讀），
+      # 在電腦上 build 完，玩家 5 分鐘內就會自動換到新版本，不用重建映像。
+      # （改了 server/*.js 才需要 docker compose restart。）
+      - .:/app
       - pokesurvivor-data:/app/server/data   # 帳號、存檔、排行榜
     restart: unless-stopped
 

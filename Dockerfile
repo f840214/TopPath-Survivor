@@ -3,6 +3,7 @@
 #   docker compose logs -f      看 log
 #   docker compose down         停止
 # 玩家資料在 volume「pokesurvivor-data」，更新映像不會清掉。
+# docker-compose.yml 會把這個資料夾掛進 /app（熱更新），COPY 只是沒掛載時的備用。
 FROM node:22-alpine
 WORKDIR /app
 COPY . .
