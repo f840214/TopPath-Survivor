@@ -899,5 +899,12 @@ G.I18n.add({
   'Tu mejor puesto: {x}': 'Your best rank: {x}',
   'Aún no estás en el top 50. Tu puesto está en Histórico.': 'You are not in the top 50 yet. Your rank is in All-time.',
   'Aún no tienes marca.': 'You do not have a record yet.',
-  'Folagor, Sekiam, PokeAlex: ¿un hueco?': 'Folagor, Sekiam, PokeAlex: room for one more?'
+  'Folagor, Sekiam, PokeAlex: ¿un hueco?': 'Folagor, Sekiam, PokeAlex: room for one more?',
+  // TopPath Survivor (21-10-2026)
+  "TopPath Survivor se juega en horizontal.": "TopPath Survivor is played in landscape.",
+  "TopPath Survivor necesita JavaScript para funcionar. Actívalo para jugar.": "TopPath Survivor needs JavaScript to work. Please enable it to play.",
+  ". No tiene anuncios ni compras.": ". It has no ads or purchases.",
+  "Versión original": "Original version",
+  "TopPath Survivor es una versión modificada de PokéSurvivor, el juego de Jonathan Piera Torregrosa (JPTER78), cuya web oficial es pokesurvivor.com. Esta versión no tiene relación con su autor. El juego es gratis: si alguien te pide pagar, no somos nosotros.": "TopPath Survivor is a modified version of PokéSurvivor, the game by Jonathan Piera Torregrosa (JPTER78), whose official website is pokesurvivor.com. This version is not related to its author. The game is free: if anyone asks you to pay, it isn't us.",
+  "TopPath Survivor no tiene ninguna criptomoneda, token ni NFT oficial, y nadie del proyecto ha creado ninguno. Cualquier token que use el nombre del juego lo han creado terceros: no nos hacemos cargo de ninguna compra, venta o inversión que hagas con ellos, y nada de lo que hay aquí es una recomendación de inversión.": "TopPath Survivor has no official cryptocurrency, token or NFT, and nobody in the project has created any. Any token using the game's name was created by third parties: we take no responsibility for any purchase, sale or investment you make with them, and nothing here is investment advice."
 });

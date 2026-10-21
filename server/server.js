@@ -241,7 +241,7 @@ function start() {
   srv.on('upgrade', (req, socket, head) => lan.upgrade(req, socket, head));
   srv.listen(PORT, HOST, () => {
     const ips = [].concat(...Object.values(os.networkInterfaces())).filter(i => i.family === 'IPv4' && !i.internal).map(i => i.address);
-    console.log(`PokéSurvivor 區網伺服器已啟動，埠 ${PORT}`);
+    console.log(`TopPath Survivor 區網伺服器已啟動，埠 ${PORT}`);
     console.log(`  這台電腦：   http://localhost:${PORT}/`);
     if (fs.existsSync('/.dockerenv')) console.log('  （在 Docker 容器內：區網內其他裝置請用「跑 Docker 的那台電腦」的 IP，埠號同上）');
     else for (const ip of ips) console.log(`  區網內其他裝置： http://${ip}:${PORT}/`);

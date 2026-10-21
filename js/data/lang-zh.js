@@ -3742,5 +3742,12 @@ G.I18n.add({
   'El juego está en inglés y en chino tradicional (se elige en Ajustes). El español ya no se ofrece.': '遊戲提供英文與繁體中文（在「設定」中選擇），不再提供西班牙文。',
   'Llega todo lo nuevo de la versión oficial hasta el 20 de octubre (38 ataques nuevos, Movimiento inicial, colección con buscador y favoritos, cooperativo más seguro...), sin perder nada de la red local.': '加入官方版截至 10 月 20 日的所有新內容（38 種新招式、初始招式、可搜尋和加入最愛的圖鑑、更安全的合作模式……），區網版的功能全部保留。',
   'Colección: al tocar a Belle o a un mago del Dado Arcoíris ya se abre su ficha (se quedaba la del Pokémon de antes). Ahora tienen también Ataque, At. Esp., Defensa y Def. Esp.': '圖鑑：點選 Belle 或彩骰的魔法師時，現在會正確打開他們的資料（之前會停留在上一隻寶可夢）。他們現在也有攻擊、特攻、防禦和特防數值。',
-  'El título del juego es ahora TopPath Survivor, en azul (también en la pestaña del navegador), y ya no sale la frase de broma bajo el título.': '遊戲標題改為藍色的 TopPath Survivor（瀏覽器分頁標題也一樣），標題下方的玩笑標語也拿掉了。'
+  'El título del juego es ahora TopPath Survivor, en azul (también en la pestaña del navegador), y ya no sale la frase de broma bajo el título.': '遊戲標題改為藍色的 TopPath Survivor（瀏覽器分頁標題也一樣），標題下方的玩笑標語也拿掉了。',
+  // TopPath Survivor (21-10-2026)
+  "TopPath Survivor se juega en horizontal.": "TopPath Survivor 需以橫向模式遊玩。",
+  "TopPath Survivor necesita JavaScript para funcionar. Actívalo para jugar.": "TopPath Survivor 需要 JavaScript，請啟用後再遊玩。",
+  ". No tiene anuncios ni compras.": "。沒有廣告或內購。",
+  "Versión original": "原作",
+  "TopPath Survivor es una versión modificada de PokéSurvivor, el juego de Jonathan Piera Torregrosa (JPTER78), cuya web oficial es pokesurvivor.com. Esta versión no tiene relación con su autor. El juego es gratis: si alguien te pide pagar, no somos nosotros.": "TopPath Survivor 是 PokéSurvivor 的修改版本；原作由 Jonathan Piera Torregrosa（JPTER78）製作，官方網站是 pokesurvivor.com。這個版本與原作者無關。遊戲是免費的：如果有人要你付錢，那不是我們。",
+  "TopPath Survivor no tiene ninguna criptomoneda, token ni NFT oficial, y nadie del proyecto ha creado ninguno. Cualquier token que use el nombre del juego lo han creado terceros: no nos hacemos cargo de ninguna compra, venta o inversión que hagas con ellos, y nada de lo que hay aquí es una recomendación de inversión.": "TopPath Survivor 沒有任何官方加密貨幣、代幣或 NFT，專案中也沒有人發行過。任何使用本遊戲名稱的代幣都是第三方建立的：你用它們進行的任何買賣或投資，我們概不負責，這裡的內容也不構成任何投資建議。"
 }, 'zh-Hant');
