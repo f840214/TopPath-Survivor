@@ -21,3 +21,6 @@ docs/CONTACTOS_CREADORES.md
 
 # Caché local de wrangler (Cloudflare)
 .wrangler/
+
+# Servidor de red local: cuentas y partidas de los jugadores
+server/data/

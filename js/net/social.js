@@ -1,5 +1,7 @@
 /* ============ social.js — apodo, amigos, en línea, invitaciones y salas ============
- * Sólo funciona con cuenta en la nube (G.DB.online). Usa:
+ * Sólo funciona con cuenta en la nube (G.DB.online). En el modo servidor
+ * (red local) G.Social es la versión de social-srv.js: abajo, la fachada que
+ * elige una u otra según G.DB.mode. Esta versión (G.SocialCloud) usa:
  *
  *   Firestore
  *     names/{apodo en minúsculas}  { uid }               apodos únicos
@@ -21,7 +23,7 @@
  *
  * El resto del juego escucha los cambios con G.Social.on(fn).
  */
-G.Social = (() => {
+G.SocialCloud = (() => {
   const VALID = /^[A-Za-z0-9_ñÑáéíóúÁÉÍÓÚ]{3,16}$/;
   const MAX_PLAYERS = 4;
   const INVITE_TTL = 3 * 60 * 1000;
@@ -534,4 +536,32 @@ G.Social = (() => {
     now,
     VALID, MAX_PLAYERS
   };
+})();
+
+/*
+ * G.Social: la nube (arriba) o el servidor de red local (social-srv.js), según
+ * G.DB.mode. Se decide en cada llamada porque el modo no se sabe hasta que
+ * G.DB.ready() acaba, y las pantallas se enganchan (on) antes.
+ */
+G.Social = (() => {
+  const impl = () => (G.DB.mode === 'server' && G.SocialSrv ? G.SocialSrv : G.SocialCloud);
+  const o = {};
+  for (const f of ['start', 'stop', 'claimNick', 'request', 'accept', 'remove', 'publishProfile', 'getProfile', 'profileData',
+                   'createRoom', 'joinRoom', 'leaveRoom', 'setOpen', 'refreshMember', 'setPlaying', 'refreshPresence',
+                   'invite', 'acceptInvite', 'declineInvite', 'now']) {
+    o[f] = (...a) => impl()[f](...a);
+  }
+  o.on = fn => { G.SocialCloud.on(fn); if (G.SocialSrv) G.SocialSrv.on(fn); };
+  o.off = fn => { G.SocialCloud.off(fn); if (G.SocialSrv) G.SocialSrv.off(fn); };
+  for (const g of ['me', 'started', 'friends', 'invites', 'room', 'uid']) Object.defineProperty(o, g, { get: () => impl()[g] });
+  o.VALID = G.SocialCloud.VALID;
+  Object.defineProperty(o, 'MAX_PLAYERS', { get: () => impl().MAX_PLAYERS });
+  o.block = (...a) => (impl().block ? impl().block(...a) : Promise.resolve({ ok: false, error: 'Sólo en la red local.' }));
+  Object.defineProperty(o, 'blocked', { get: () => impl().blocked || [] });
+  // Lista de salas: sólo la tiene el servidor de red local.
+  o.listRooms = () => (impl().listRooms ? impl().listRooms() : Promise.resolve([]));
+  o.setTeam = t => (impl().setTeam ? impl().setTeam(t) : Promise.resolve({ ok: false, error: 'Sólo en la red local.' }));
+  Object.defineProperty(o, 'rooms', { get: () => impl().rooms || [] });
+  Object.defineProperty(o, 'rejoinable', { get: () => !!impl().rejoinable });
+  return o;
 })();

@@ -24,11 +24,19 @@ G.Rift = (() => {
   // Desde 2 min antes de la Sentencia de Arceus (minuto 30) ya no se abren.
   const CHECK = 30, CHANCE = 0.2, TTL = 45;
   const ARENA_R = 11, ARENA_TIME = 120, FROM = 75;
-  let rift = null;          // { x, y, ttl, t }
-  let arena = null;         // { tx, ty, r, dex, shiny, x, y, back, biome, t, phase, endT, bossId }
-  let checkT = CHECK, asked = false, downT = 0, misses = 0;
+  let rift = null;          // { x, y, ttl, t, team } (team: enfrentamiento, equipo que la ha cogido)
+  let arena = null;         // { tx, ty, r, dex, shiny, x, y, back, biome, t, phase, endT, bossId, team, mine }
+  let checkT = CHECK, asked = false, downT = 0, misses = 0, claimMsgT = 0;
   const authority = () => !G.Coop.active || G.Coop.isHost;
   const TS = () => G.Tiles.T * G.Sprites.PX;
+  // Enfrentamiento: la grieta es de UN equipo (el primero que la toca). Sólo
+  // ese equipo viaja a la arena; los demás siguen en el mapa y el anfitrión
+  // lleva las dos cosas a la vez (la arena está en otra zona del mismo mundo).
+  const vs = () => G.Coop.vs;
+  /** Jugadores que van a la arena (en enfrentamiento, sólo los del equipo). */
+  const arenaPlayers = team => (vs() ? G.Coop.players().filter(p => p.team === team) : G.Game.everyone());
+  /** ¿Está `o` dentro de la zona de la arena? (para no hacer salir enemigos allí) */
+  function inside(o) { return !!arena && G.U.dist2(o.x, o.y, arena.x, arena.y) < (arena.r * TS() * 2) ** 2; }
 
   function reset() { rift = null; arena = null; checkT = CHECK; asked = false; downT = 0; misses = 0; }
 
@@ -39,7 +47,12 @@ G.Rift = (() => {
       rift.t += dt;
       rift.ttl -= dt;
       if (rift.ttl <= 0) { rift = null; return; }
-      if (!arena && !pl.dead && G.U.dist2(pl.x, pl.y, rift.x, rift.y - 10) < 30 * 30) enter();
+      if (claimMsgT > 0) claimMsgT -= dt;
+      if (!arena && !pl.dead && G.U.dist2(pl.x, pl.y, rift.x, rift.y - 10) < 30 * 30) {
+        if (vs() && rift.team && rift.team !== G.Coop.myTeam) {
+          if (claimMsgT <= 0) { claimMsgT = 3; G.Spawner.say('Esta grieta ya la ha cogido el equipo ' + rift.team, 2.4, true); }
+        } else enter();
+      }
     } else if (!arena && authority() && time > FROM && time < G.Judgment.AT - 120) {
       checkT -= dt;
       if (checkT <= 0) {
@@ -67,7 +80,7 @@ G.Rift = (() => {
 
   /** Aparece la grieta (también la que manda el anfitrión). */
   function show(x, y, ttl) {
-    rift = { x, y, ttl, t: 0 };
+    rift = { x, y, ttl, t: 0, team: 0 };
     asked = false;
     // (El aviso grande lo dibuja hud.js mientras rift.t < 4,5 s.)
     G.Audio.sfx('rift');
@@ -77,7 +90,7 @@ G.Rift = (() => {
   function enter() {
     if (asked) return;
     asked = true;
-    if (authority()) start();
+    if (authority()) start(null, G.Coop.myTeam);
     else G.Coop.toHost(['re']);
   }
 
@@ -86,7 +99,8 @@ G.Rift = (() => {
   /** Quien manda: elige legendario y lugar, y avisa a todos. */
   let nextType = null;          // pruebas/vídeos: tipo de la próxima arena
 
-  function start(forceType) {
+  /** @param team  enfrentamiento: equipo que entra (el anfitrión lo sabe por quién lo pide) */
+  function start(forceType, team = 0) {
     if (arena) return;
     forceType = forceType || nextType; nextType = null;
     let pool = G.DEX.filter(p => p.leg && G.SPRITE_META[p.dex]);
@@ -101,9 +115,16 @@ G.Rift = (() => {
       tx: 5000 + Math.floor(Math.random() * 3000), ty: 5000 + Math.floor(Math.random() * 3000), r: ARENA_R,
       dex: mon.dex, shiny: G.Sprites.hasShiny(mon.dex) && Math.random() < 1 / 512,
       // La arena es la de uno de sus tipos, al azar.
-      type: forceType || G.U.pick(mon.types)
+      type: forceType || G.U.pick(mon.types),
+      team: vs() ? team : 0
     };
-    if (G.Coop.isHost) G.Coop.broadcast(['arena', cfg]);
+    if (G.Coop.isHost) {
+      if (vs()) {
+        // Sólo viaja el equipo; a los demás se les cierra la grieta.
+        G.Coop.emitTeam(['arena', cfg], team);
+        for (let t = 1; t <= G.Coop.teamsN; t++) if (t !== team) G.Coop.emitTeam(['riftc', team], t);
+      } else G.Coop.broadcast(['arena', cfg]);
+    }
     begin(cfg);
     spawnLegend();
   }
@@ -112,22 +133,28 @@ G.Rift = (() => {
   function begin(cfg) {
     const pl = G.Game.player;
     const ts = TS();
+    // Enfrentamiento: `mine` = tú vas a la arena. El anfitrión de otro equipo la
+    // lleva (legendario, tiempo) sin moverse del mapa.
+    const mine = !vs() || cfg.team === G.Coop.myTeam;
     arena = Object.assign({}, cfg, {
       x: cfg.tx * ts + ts / 2, y: cfg.ty * ts + ts / 2,
-      back: { x: pl.x, y: pl.y }, biome: G.World.biome, t: 0, phase: 'fight', endT: 0, bossId: 0
+      back: { x: pl.x, y: pl.y }, biome: G.World.biome, t: 0, phase: 'fight', endT: 0, bossId: 0, mine
     });
-    rift = null; asked = false; downT = 0;
-    if (authority()) G.EnemyMgr.stash(); else G.EnemyMgr.clearRemote();
+    if (mine) rift = null; else if (rift) { rift.team = cfg.team; rift.ttl = Math.min(rift.ttl, 15); }
+    asked = false; downT = 0;
+    // (Enfrentamiento: el mapa sigue para los otros equipos: no se guardan los enemigos.)
+    if (!vs()) { if (authority()) G.EnemyMgr.stash(); else G.EnemyMgr.clearRemote(); }
+    G.World.setArena({ tx: cfg.tx, ty: cfg.ty, r: cfg.r, type: cfg.type });
+    if (!mine) return;
     G.Projectiles.clear();
     G.Combat.clearFields();
     G.Hazards.clear();
-    G.World.setArena({ tx: cfg.tx, ty: cfg.ty, r: cfg.r, type: cfg.type });
     G.World.setBiome(G.Tiles.arenaBiome(cfg.type), true);
     // Cada arena trae su clima (el volcán, sol; el glaciar, nieve...).
     const th = G.Tiles.ARENA_THEMES[cfg.type];
     if (th && th.weather) G.Weather.force(th.weather, ARENA_TIME + 15);
     // Todos al sur de la arena, en fila; el legendario aparece al norte.
-    const ps = G.Game.everyone();
+    const ps = arenaPlayers(cfg.team);
     ps.forEach((p, i) => { p.x = arena.x + (i - (ps.length - 1) / 2) * 34; p.y = arena.y + ts * 3; });
     G.Camera.x = pl.x; G.Camera.y = pl.y;
     G.Game.flash('#c9a6ff', 0.9);
@@ -138,7 +165,7 @@ G.Rift = (() => {
   function spawnLegend() {
     const mon = G.DEX_BY[arena.dex];
     const t = G.Game.st.time;
-    const n = G.Game.everyone().length;
+    const n = arenaPlayers(arena.team).length || 1;     // (enfrentamiento: sólo el equipo que entra)
     const ts = TS();
     const def = {
       dex: mon.dex, name: mon.name,
@@ -167,6 +194,7 @@ G.Rift = (() => {
     for (const e of G.EnemyMgr.all()) {
       if (e.remote) continue;
       const dx = e.x - arena.x, dy = e.y - arena.y, d = Math.hypot(dx, dy);
+      if (vs() && d > max * 2) continue;              // enfrentamiento: los del mapa no son de la arena
       if (d > max) { e.x = arena.x + dx / d * max; e.y = arena.y + dy / d * max; }
     }
   }
@@ -177,10 +205,12 @@ G.Rift = (() => {
       if (!authority()) return;
       keepInside();
       const boss = G.EnemyMgr.get(arena.bossId);
-      if (!boss || boss.dead) { G.Coop.isHost && G.Coop.broadcast(['aw']); won(); return; }
-      const allDown = G.Game.everyone().every(p => p.dead);
+      const tell = ev => { if (G.Coop.isHost) { if (vs()) G.Coop.emitTeam(ev, arena.team); else G.Coop.broadcast(ev); } };
+      if (!boss || boss.dead) { tell(['aw']); won(); return; }
+      const ps = arenaPlayers(arena.team);
+      const allDown = !ps.length || ps.every(p => p.dead);
       downT = allDown ? downT + dt : 0;
-      if (downT > 1.4 || arena.t > ARENA_TIME) { G.Coop.isHost && G.Coop.broadcast(['al']); lost(); }
+      if (downT > 1.4 || arena.t > ARENA_TIME) { tell(['al']); lost(); }
       return;
     }
     arena.endT -= dt;
@@ -190,6 +220,7 @@ G.Rift = (() => {
   function won() {
     if (!arena || arena.phase !== 'fight') return;
     arena.phase = 'won'; arena.endT = 5;
+    if (!arena.mine) return;                           // (anfitrión de otro equipo: sólo la lleva)
     G.Progress.event('rift', { type: arena.type });
     G.Pickups.pullAll();
     G.Spawner.say('¡Has vencido a ' + G.DEX_BY[arena.dex].name + '! Recoge el premio…', 3.4, true);
@@ -205,6 +236,7 @@ G.Rift = (() => {
   function lost() {
     if (!arena || arena.phase !== 'fight') return;
     arena.phase = 'lost'; arena.endT = 1.2;
+    if (!arena.mine) return;
     G.Spawner.say('La grieta os ha expulsado…', 2.6, true);
     G.Audio.sfx('back');
   }
@@ -214,17 +246,18 @@ G.Rift = (() => {
     const pl = G.Game.player;
     const a = arena;
     arena = null;
-    G.World.setBiome(a.biome, true);
-    G.Weather.clear();
     // Invitado: no se borra nada. El anfitrión avisa de los de la arena que se
     // van y de los del mapa que vuelven; si el invitado terminaba su cuenta
     // atrás un poco más tarde (pasa casi siempre), borraba los que acababan de
     // volver y no se veían hasta que caían (sólo sus ataques).
-    if (authority()) G.EnemyMgr.restore();
+    if (authority() && !vs()) G.EnemyMgr.restore();
+    if (!a.mine) return;                               // (anfitrión de otro equipo: nada que deshacer)
+    G.World.setBiome(a.biome, true);
+    G.Weather.clear();
     G.Projectiles.clear();
     G.Combat.clearFields();
     G.Hazards.clear();
-    for (const p of G.Game.everyone()) { p.x = a.back.x; p.y = a.back.y; }
+    for (const p of arenaPlayers(a.team)) { p.x = a.back.x; p.y = a.back.y; }
     pl.x = a.back.x; pl.y = a.back.y;
     if (pl.dead) pl.revive(0.3);
     G.Camera.x = pl.x; G.Camera.y = pl.y;
@@ -245,10 +278,13 @@ G.Rift = (() => {
         const w = img.width * P, h = img.height * P;
         const fadeIn = Math.min(1, rift.t * 2), fadeOut = Math.min(1, rift.ttl / 1.5);
         ctx.save();
-        ctx.globalAlpha = 0.25 * fadeIn * fadeOut;
-        ctx.fillStyle = '#7b3cff';
+        // Enfrentamiento: cogida por otro equipo: apagada y con su color.
+        const claimed = rift.team && G.Coop.vs && rift.team !== G.Coop.myTeam;
+        if (claimed) ctx.globalAlpha = 0.45;
+        ctx.globalAlpha *= 0.25 * fadeIn * fadeOut;
+        ctx.fillStyle = claimed ? G.Coop.TEAM_COLORS[rift.team - 1] : '#7b3cff';
         ctx.beginPath(); ctx.ellipse(rift.x, rift.y, 34, 12, 0, 0, 6.2832); ctx.fill();
-        ctx.globalAlpha = fadeIn * fadeOut;
+        ctx.globalAlpha = (claimed ? 0.45 : 1) * fadeIn * fadeOut;
         ctx.drawImage(img, Math.round(rift.x - w / 2), Math.round(rift.y - h + 4), w, h);
         ctx.restore();
         if (Math.random() < 0.3) G.FX.px(rift.x + G.U.rand(-14, 14), rift.y - G.U.rand(10, 80), '#d9c2ff', { vy: -40, life: 0.6 });
@@ -262,6 +298,7 @@ G.Rift = (() => {
     switch (ev[0]) {
       case 'rift': show(ev[1], ev[2], ev[3]); break;
       case 'riftx': rift = null; break;
+      case 'riftc': if (rift) { rift.team = ev[1]; rift.ttl = Math.min(rift.ttl, 15); } break;
       case 'arena': begin(ev[1]); break;
       case 'aw': won(); break;
       case 'al': lost(); break;
@@ -269,9 +306,12 @@ G.Rift = (() => {
   }
 
   return {
-    reset, update, drawable, onEvent, enterRequest() { if (!arena) start(); },
+    reset, update, drawable, onEvent, inside,
+    /** Anfitrión: un invitado ha tocado la grieta (enfrentamiento: con su equipo). */
+    enterRequest(team = 0) { if (!arena && !(vs() && rift && rift.team && rift.team !== team)) start(null, team); },
     get rift() { return rift; }, get arena() { return arena; },
-    get inArena() { return !!arena; },
+    /** ¿Estás TÚ en la arena? (en enfrentamiento el anfitrión puede llevarla sin estar) */
+    get inArena() { return !!arena && arena.mine !== false; },
     get timeLeft() { return arena ? Math.max(0, ARENA_TIME - arena.t) : 0; },
     debugOpen() { open(); },
     /** Para pruebas: arena de un tipo ya. */

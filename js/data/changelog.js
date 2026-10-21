@@ -6,6 +6,50 @@
  * Cada línea en español y en inglés.
  */
 G.CHANGELOG = [
+  { d: '2026-10-16', title: ['Juega en tu red local', 'Play on your local network'], new: [
+    ['Nuevo banner "Dado Arcoíris" en el gacha con seis magos épicos propios: Glacius, Floria, Amora, Ignis, Dulcín y Voltio. Cada uno con su repertorio, y animaciones de espera, andar y ataque.',
+     'New "Rainbow Dice" gacha banner with six original Epic mages: Glacius, Floria, Amora, Ignis, Dulcín and Voltio. Each has its own move set and idle, walk and attack animations.'],
+    ['El juego está en chino tradicional (繁體中文): se elige en Ajustes. Gracias al parche de la comunidad del que vienen las traducciones.',
+     'The game is now in Traditional Chinese (繁體中文): pick it in Settings. Thanks to the community patch the translations come from.'],
+    ['Belle ya tiene animaciones de ataque y de disparo.', 'Belle now has attack and shoot animations.'],
+    ['En la pausa se puede quitar el objeto equipado. En el servidor de red local, al crear la cuenta se puede empezar con todos los Pokémon.',
+     'You can remove your equipped item from the pause menu. On the local-network server, you can start with every Pokémon when creating the account.'],
+    ['Nuevo modo Enfrentamiento en la red local: hasta 3 equipos de 3 jugadores. Cada equipo sube de nivel y cuenta sus bajas por su cuenta, se puede atacar a los otros equipos (una cuarta parte del daño; quien cae así reaparece a los 5 s) y cada grieta es sólo para el primer equipo que la toca. Gana el equipo con más bajas.',
+     'New Versus mode on the local network: up to 3 teams of 3 players. Each team levels up and counts its kills separately, you can attack the other teams (a quarter of the damage; whoever falls that way respawns after 5 s) and each rift belongs to the first team that touches it. The team with the most kills wins.'],
+    ['Si recargas la página (o se te cierra el navegador) en plena partida en grupo de la red local, puedes volver a ella desde Multijugador con tu Pokémon tal como lo tenías: movimientos, objeto, vida y posición. El sitio se guarda 3 minutos.',
+     'If you reload the page (or the browser closes) during a local-network group run, you can go back to it from Multiplayer with your Pokémon just as you had it: moves, item, HP and position. Your seat is kept for 3 minutes.'],
+    ['Al crear una sala se elige cuántos jugadores caben (de 2 a 8). Con más de 4 jugadores hay más enemigos a la vez: hasta 128 con 8.',
+     'When creating a room you choose how many players fit (2 to 8). With more than 4 players there are more enemies at once: up to 128 with 8.'],
+    ['En la red local el cooperativo admite hasta 8 jugadores (en la versión en línea siguen siendo 4).',
+     'On the local network, co-op allows up to 8 players (the online version stays at 4).'],
+    ['Amistad: cada 10 partidas (de 2 minutos o más) con un Pokémon dan 1 punto, hasta 100. Cada punto sube un poco su vida, ataque y velocidad (al máximo: +40 %, +30 % y +10 %). Se ve en su ficha de la Pokédex.',
+     'Friendship: every 10 runs (2 minutes or longer) with a Pokémon give 1 point, up to 100. Each point slightly raises its HP, attack and speed (at max: +40%, +30% and +10%). Shown on its Pokédex page.'],
+    ['Tres logros nuevos de amistad: Buenos amigos (10), Inseparables (50) y Alma gemela (100 con un solo Pokémon).',
+     'Three new friendship achievements: Good friends (10), Inseparable (50) and Soulmate (100 with a single Pokémon).'],
+    ['Amigos (red local): tarjetas con el compañero de cada jugador, buscador y lista negra (los bloqueados no te pueden invitar ni entrar en tus salas). Las salas se crean desde un panel nuevo y las Novedades están en el menú.',
+     'Friends (local network): cards with each player\'s partner, a search box and a blocklist (blocked players can\'t invite you or join your rooms). Rooms are created from a new panel and What\'s new is in the menu.'],
+    ['El menú se divide en Un jugador y Multijugador. En la red local, Multijugador muestra las salas abiertas y se entra directamente, sin invitación.',
+     'The menu is split into Single player and Multiplayer. On the local network, Multiplayer lists the open rooms and you join directly, without an invitation.'],
+    ['Al crear la cuenta ya no hay test de personalidad: se elige el compañero inicial directamente.',
+     'No more personality test when creating an account: you pick your starter directly.'],
+    ['Se quita el botón de Ajustes de la barra de arriba (ya está en el menú y en la pausa).',
+     'The Settings button is removed from the top bar (it is already in the menu and in the pause screen).'],
+    ['En la red local: ranking propio, todos los jugadores del servidor son amigos (sin solicitudes) y cooperativo a través del propio servidor.',
+     'On the local network: its own leaderboard, every player on the server is already a friend (no requests) and co-op runs through the server itself.'],
+    ['Cooperativo: si a un compañero se le corta la conexión, se le guarda el sitio un minuto y puede volver a la partida sin perder nada.',
+     "Co-op: if a teammate's connection drops, their seat is kept for a minute and they can rejoin the run without losing anything."],
+    ['El juego se puede instalar en un ordenador de una red local (sin internet): las cuentas y las partidas se guardan en ese ordenador y se entra desde cualquier aparato de la red con nombre y contraseña.',
+     'The game can be installed on a computer on a local network (no internet needed): accounts and saves are stored on that computer and you log in from any device on the network with a name and password.']
+  ], fix: [
+    ['Los tickets de la barra de arriba ya no se descolocan en pantallas estrechas.', 'The tickets in the top bar no longer get misaligned on narrow screens.']
+  ], chg: [
+    ['Belle pasa a ser de tipo Fantasma/Psíquico, con repertorio nuevo: Bola Sombra (inicial), Confusión, Psicorrayo, Psíquico, Psicocorte, Infortunio, Lengüetazo, Sustituto, Danza Espada y Fortaleza.',
+     'Belle is now Ghost/Psychic, with a new move set: Shadow Ball (starting move), Confusion, Psybeam, Psychic, Psycho Cut, Hex, Lick, Substitute, Swords Dance and Harden.']
+  ] },
+  { d: '2026-10-15', title: ['Belle llega a Kanto', 'Belle arrives in Kanto'], new: [
+    ['Nuevo personaje: Belle (Veneno/Agua), Legendaria del banner de Kanto. Tiene su propio repertorio de 8 movimientos (empieza con Picotazo Veneno) y no sale como salvaje ni como jefe.',
+     'New character: Belle (Poison/Water), a Legendary in the Kanto banner. She has her own set of 8 moves (starting with Poison Sting) and never shows up as a wild Pokémon or a boss.']
+  ] },
   { d: '2026-10-14', title: ['Recupera tu cuenta con Gmail', 'Recover your account with Gmail'], new: [
     ['Si juegas con nombre y contraseña, puedes vincular tu Gmail: si un día olvidas la contraseña, entras con Google y es tu misma cuenta. Te lo ofrecemos al entrar.',
      'If you play with a name and password, you can link your Gmail: if you ever forget your password, sign in with Google and it is the same account. We offer it when you sign in.']

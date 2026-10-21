@@ -10,7 +10,14 @@ G.TestUI = (() => {
     $('starter-ok').onclick = () => { if (picked) choose(picked); };
   }
 
+  // Sin test de personalidad: se va directo a elegir compañero (las preguntas
+  // siguen en el código por si se quieren recuperar: startTest()).
   function start() {
+    idx = 0; scores = {}; result = null;
+    G.UI.chrome(false);
+    openStarters();
+  }
+  function startTest() {
     idx = 0; scores = {}; result = null;
     G.UI.chrome(false);
     G.UI.show('scr-test');
@@ -58,6 +65,7 @@ G.TestUI = (() => {
     picked = null;
     $('starter-ok').disabled = true;
     $('starter-info').textContent = 'Selecciona un Pokémon';
+    $('starter-back').classList.toggle('hidden', !result);     // sin test no hay resultado al que volver
     const grid = $('starter-grid');
     grid.innerHTML = '';
     for (const s of G.STARTERS) {
@@ -91,5 +99,5 @@ G.TestUI = (() => {
     G.Flow.goMenu();
   }
 
-  return { init, start };
+  return { init, start, startTest };
 })();

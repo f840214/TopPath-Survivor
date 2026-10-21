@@ -19,6 +19,9 @@ G.Sprites = (() => {
   /** ¿Flota en su sprite? (tools/hover_flags.py) Pasa por encima de rocas y agua. */
   function hovers(dex) { const m = meta(dex); return !!(m && m.hv); }
 
+  /** Escala propia del sprite (meta.k, data/custom.js): el arte a 64 px se ve a la mitad, como el de PMD. */
+  function sizeK(dex) { const m = meta(dex); return m && m.k ? m.k : 1; }
+
   /**
    * Versión blanca de una imagen (para el destello al recibir un golpe).
    * Se hace una vez por hoja con composición "source-in": mucho más barato
@@ -95,7 +98,8 @@ G.Sprites = (() => {
     }
     if (sheets.size >= MAX_SHEETS) evict(now);
     s = { ready: false, failed: false, img: new Image(), tries: 0, retryAt: 0, at: now,
-          src: `assets/pokemon/${dex}/${shiny ? 's/' : ''}${name}.png` };
+          // Personajes propios (custom.js): `v` en su geometría cambia la URL cuando se redibujan (la caché de sprites es para siempre).
+          src: `assets/pokemon/${dex}/${shiny ? 's/' : ''}${name}.png${m && m.v ? '?v=' + m.v : ''}` };
     s.img.onload = () => { s.ready = true; };
     s.img.onerror = () => { s.failed = true; s.retryAt = performance.now() + 1000 * Math.min(8, 2 ** s.tries++); };
     s.img.src = s.src;
@@ -127,13 +131,13 @@ G.Sprites = (() => {
   function bodyRadius(dex, scale = 1) {
     const m = animMeta(dex, 'Idle');
     const w = m ? m.w : 32;
-    return G.U.clamp(w * 0.22, 5, 26) * PX * scale;
+    return G.U.clamp(w * 0.22, 5, 26) * PX * scale * sizeK(dex);
   }
 
   /** Alto visual aproximado (para barras de vida y números de daño). */
   function bodyHeight(dex, scale = 1) {
     const m = animMeta(dex, 'Idle');
-    return (m ? m.ay : 24) * PX * scale;
+    return (m ? m.ay : 24) * PX * scale * sizeK(dex);
   }
 
   /** Sombra elíptica bajo los pies, tamaño según el ShadowSize de PMD. */
@@ -228,7 +232,7 @@ G.Sprites = (() => {
     draw(ctx, x, y, opts = {}) {
       let m = animMeta(this.dex, this.cur, this.shiny);
       let s = sheet(this.dex, this.cur, this.shiny);
-      const k = PX * this.scale;
+      const k = PX * this.scale * sizeK(this.dex);
       if (s && !s.ready) {
         // Mientras carga esta animación, enseña Idle si ya está.
         const idle = sheet(this.dex, 'Idle', this.shiny);
@@ -258,6 +262,6 @@ G.Sprites = (() => {
     }
   }
 
-  return { PX, meta, hasShiny, hovers, white, animMeta, sheet, preload, dirFromAngle, bodyRadius, bodyHeight,
+  return { PX, meta, hasShiny, hovers, sizeK, white, animMeta, sheet, preload, dirFromAngle, bodyRadius, bodyHeight,
            drawShadow, Animator, ANIMS, get sheetCount() { return sheets.size; } };
 })();

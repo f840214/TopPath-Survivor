@@ -1,17 +1,19 @@
 /* ============ menu.js — menú principal, colección y mejoras ============ */
 G.MenuUI = (() => {
   const $ = G.UI.$;
-  const GEN_NAMES = ['Kanto', 'Johto', 'Hoenn', 'Sinnoh', 'Teselia', 'Kalos', 'Alola', 'Galar', 'Paldea'];
+  const GEN_NAMES = ['Kanto', 'Johto', 'Hoenn', 'Sinnoh', 'Teselia', 'Kalos', 'Alola', 'Galar', 'Paldea', 'Dado Arcoíris'];
   let dexFilter = 'all', dexGen = 1, dexSel = null;
 
   function init() {
-    const ICON = { play: 'ball', dex: 'book', upgrades: 'up', gacha: 'ball4', goals: 'medal3', friends: 'friends', rank: 'trophy', settings: 'gear' };
+    const ICON = { play: 'ball', multi: 'friends', news: 'book', dex: 'book', upgrades: 'up', gacha: 'ball4', goals: 'medal3', friends: 'friends', rank: 'trophy', settings: 'gear' };
     document.querySelectorAll('#scr-menu [data-go]').forEach(b => {
       b.insertAdjacentHTML('afterbegin', `<span class="mi-ico">${G.Icons.html(ICON[b.dataset.go], 26)}</span>`);
-      b.dataset.sfx = b.dataset.go === 'play' ? 'confirm' : 'click';
+      b.dataset.sfx = b.dataset.go === 'play' || b.dataset.go === 'multi' ? 'confirm' : 'click';
       b.onclick = () => {
         const go = b.dataset.go;
-        if (go === 'play') { if (G.Social.room) G.LobbyUI.open(); else G.Flow.play(); }
+        if (go === 'play') G.Flow.play();
+        // Multijugador: en la red local, la lista de salas; en la nube, Amigos (invitaciones) como siempre.
+        else if (go === 'multi') { if (G.Social.room) G.LobbyUI.open(); else if (G.DB.mode === 'server') G.RoomsUI.open(); else G.FriendsUI.open(); }
         else if (go === 'dex') openDex();
         else if (go === 'upgrades') openUpgrades();
         else if (go === 'gacha') G.GachaUI.open();
@@ -19,6 +21,7 @@ G.MenuUI = (() => {
         else if (go === 'friends') G.FriendsUI.open();
         else if (go === 'rank') G.RankingUI.open();
         else if (go === 'settings') G.SettingsUI.open();
+        else if (go === 'news') G.NewsUI.open();
       };
     });
     document.querySelectorAll('[data-back]').forEach(b => { b.onclick = open; });
@@ -42,7 +45,9 @@ G.MenuUI = (() => {
     $('menu-partner').style.setProperty('--stage-c', shiny ? '#9ae6ff' : G.U.TYPE_COLOR[mon.types[0]]);
     $('menu-partner').classList.toggle('shiny', shiny);
     $('menu-partner-name').innerHTML = mon.name + (shiny ? ' ' + G.Icons.html('shiny', 24) : '');
-    $('menu-partner-info').innerHTML = G.UI.typeChips(mon.types) + ' ' + G.UI.stars(mon.rarity);
+    const fr = G.DB.friendship(mon.dex);
+    $('menu-partner-info').innerHTML = G.UI.typeChips(mon.types) + ' ' + G.UI.stars(mon.rarity) +
+      ` <span class="friend-pill" title="${G.I18n.f('Amistad: {x} de {x} · {x} partidas con él', fr.pts, fr.max, fr.runs)}">♥ ${fr.pts}/${fr.max}</span>`;
     // Normal / shiny a mano, aquí mismo (en el móvil no se encontraba en la ficha).
     const seg = $('menu-shiny');
     seg.classList.toggle('hidden', !G.DB.ownsShiny(mon.dex));
@@ -87,15 +92,20 @@ G.MenuUI = (() => {
   /** Texto bajo "Amigos" y "Jugar": quién está en línea, solicitudes, sala. */
   function socialLine() {
     const room = G.Social.room;
-    const play = document.querySelector('#scr-menu [data-go=play] small');
-    if (play) play.textContent = room ? 'Volver a tu sala (' + room.members.length + '/' + G.Social.MAX_PLAYERS + ')' : 'Entra en la mazmorra';
+    const multi = $('menu-multi-sub');
+    if (multi) {
+      multi.textContent = G.Social.rejoinable ? 'Volver a la partida en curso'
+        : room ? 'Volver a tu sala (' + room.members.length + '/' + (room.max || G.Social.MAX_PLAYERS) + ')'
+        : G.DB.mode === 'server' ? 'Salas de la red, hasta ' + G.Social.MAX_PLAYERS : 'Juega en grupo, hasta ' + G.Social.MAX_PLAYERS;
+      multi.classList.toggle('gold', !!G.Social.rejoinable);
+    }
     const fr = G.Social.friends;
     const on = fr.filter(f => f.status === 'ok' && f.online).length;
     const req = fr.filter(f => f.status === 'in').length;
     const parts = [];
     if (on) parts.push(on + ' en línea');
     if (req) parts.push(req + (req === 1 ? ' solicitud' : ' solicitudes'));
-    $('menu-friends-sub').textContent = parts.length ? parts.join(' · ') : 'Juega en grupo, hasta 4';
+    $('menu-friends-sub').textContent = parts.length ? parts.join(' · ') : 'Juega en grupo, hasta ' + G.Social.MAX_PLAYERS;
     $('menu-friends-sub').classList.toggle('gold', req > 0);
   }
 
@@ -203,6 +213,8 @@ G.MenuUI = (() => {
         ${bar('Vida', p.hp, max.hp, p.hp)}
         ${bar('Ataque', p.atk, max.atk, '×' + p.atk.toFixed(2))}
         ${bar('Velocidad', p.spd, max.spd, p.spd)}
+        ${(() => { const f = G.DB.friendship(dex); return `<div class="stat friend"><span>Amistad</span><div class="bar"><i style="width:${f.pts}%"></i></div><span>${f.pts}/${f.max}</span></div>
+          <p class="note" style="margin:2px 0 0">${G.I18n.f('{x} partidas con él', f.runs)}${f.pts ? ' · ' + G.I18n.f('vida +{x} %, ataque +{x} %, velocidad +{x} %', Math.round(f.hp * 100), Math.round(f.atk * 100), Math.round(f.spd * 100)) : ''}${f.next ? ' · ' + G.I18n.f('siguiente punto en {x} partidas', f.next) : ''}</p>`; })()}
         <p style="font-size:14px;margin:10px 0 4px">Empieza con <b class="gold">${G.Moves.BY_ID[G.startMoveOf(dex)].name}</b></p>
         <p class="move-icons" title="Movimientos que puede aprender">
           ${G.Moves.poolFor(p).map(id => `<span title="${G.Moves.BY_ID[id].name}">${G.Icons.html('move:' + id, 16)}</span>`).join('')}</p>

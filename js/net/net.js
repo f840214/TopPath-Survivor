@@ -16,6 +16,12 @@
  * Se envía por el canal directo si está abierto; si no, por el relé. El que
  * recibe escucha los dos, así que no hace falta ponerse de acuerdo.
  *
+ * MODO SERVIDOR (red local, G.DB.mode === 'server'): la señalización y el relé
+ * van por el WebSocket de G.Srv (server/lan.js) en vez de por Firebase, y el
+ * relé SÍ se usa (es nuestro propio servidor: no cuesta nada). Así una pareja
+ * que no consiga canal directo juega igual, y si el canal directo se cae en
+ * plena partida se sigue por el relé sin cortar nada.
+ *
  * API:  open(roomId, isHost, hostUid) · close() · send(to, msg) · toHost(msg)
  *       broadcast(msg) · on(fn(from, msg)) · onPeer(fn(uid, state))
  *       peers() · mode(uid) -> 'connecting' | 'direct' | 'relay' | 'closed'
@@ -28,7 +34,9 @@ G.Net = (() => {
   // costaba del cooperativo. Sin conexión directa ni TURN, esa pareja no puede jugar
   // junta ('failed') y el anfitrión lo reintenta cada RETRY_MS. Por la base de datos
   // sólo pasa la señalización (unos pocos mensajes pequeños para conectarse).
-  const ALLOW_RELAY = false, RETRY_MS = 15000;
+  const RETRY_MS = 15000;
+  const srvMode = () => G.DB.mode === 'server';
+  const allowRelay = () => srvMode();
 
   // ---------------- TURN (Cloudflare) ----------------
   const TURN_URL = 'https://turn.pokesurvivor.com/';
@@ -70,25 +78,29 @@ G.Net = (() => {
   function open(id, host, hostId) {
     if (roomId === id) return;
     close();
-    const fb = G.DB.fb;
-    rtdb = fb.rtdb; uid = fb.uid;
     roomId = id; isHost = host; hostUid = hostId;
-    fetchTurn();                    // se piden ya, para tenerlas al conectar
-    qref = rtdb.ref('rooms/' + id + '/q/' + uid);
-    qref.on('child_added', s => {
-      const raw = s.val();
-      s.ref.remove().catch(() => {});
-      let m;
-      try { m = JSON.parse(raw); } catch (e) { return; }
-      if (!m || !m.f) return;
-      if (m.sig) onSignal(m.f, m.sig);
-      else deliver(m.f, m.d);
-    });
+    if (srvMode()) {
+      rtdb = null; uid = G.DB.key;
+    } else {
+      const fb = G.DB.fb;
+      rtdb = fb.rtdb; uid = fb.uid;
+      fetchTurn();                    // se piden ya, para tenerlas al conectar
+      qref = rtdb.ref('rooms/' + id + '/q/' + uid);
+      qref.on('child_added', s => {
+        const raw = s.val();
+        s.ref.remove().catch(() => {});
+        let m;
+        try { m = JSON.parse(raw); } catch (e) { return; }
+        if (!m || !m.f) return;
+        if (m.sig) onSignal(m.f, m.sig);
+        else deliver(m.f, m.d);
+      });
+    }
     // Invitado: hueco para el anfitrión desde ya (se sustituye al llegar su
     // oferta). Así, si no llega nunca, se sigue por el relé y se sabe cuándo se va.
     if (!isHost) {
       const p = { pc: null, dc: null, mode: 'connecting', timer: 0 };
-      p.timer = setTimeout(() => { if (p.mode === 'connecting') { p.mode = ALLOW_RELAY ? 'relay' : 'failed'; emitPeer(hostId); } }, DIRECT_TIMEOUT + 3000);
+      p.timer = setTimeout(() => { if (p.mode === 'connecting') { p.mode = allowRelay() ? 'relay' : 'failed'; emitPeer(hostId); } }, DIRECT_TIMEOUT + 3000);
       peers.set(hostId, p);
     }
   }
@@ -97,6 +109,25 @@ G.Net = (() => {
     for (const u of [...peers.keys()]) drop(u);
     if (qref) { qref.off(); qref = null; }
     roomId = null; isHost = false; hostUid = null;
+  }
+
+  // Modo servidor: lo que llega por el WebSocket (relé y señalización).
+  if (G.Srv) G.Srv.on(m => {
+    if (!roomId || !srvMode() || !m.f) return;
+    if (m.k === 'sig') onSignal(m.f, m.sig);
+    else if (m.k === 'q') deliver(m.f, m.d);
+  });
+
+  /**
+   * Anfitrión (modo servidor): un invitado ha vuelto tras desconectarse. Si no
+   * hay canal directo con él, se vuelve a negociar uno (mientras, va por el relé).
+   */
+  function reconnect(u) {
+    if (!roomId || !isHost || u === uid) return;
+    const p = peers.get(u);
+    if (p && p.mode === 'direct') return;
+    drop(u, true);
+    connect(u);
   }
 
   /** El anfitrión llama a esto cuando cambian los miembros de la sala. */
@@ -158,7 +189,7 @@ G.Net = (() => {
   function useRelay(u) {
     const p = peers.get(u);
     if (!p || p.mode === 'direct' || p.mode === 'closed' || p.mode === 'failed') return;
-    if (ALLOW_RELAY) { p.mode = 'relay'; emitPeer(u); return; }
+    if (allowRelay()) { p.mode = 'relay'; emitPeer(u); return; }
     // Sin relé: no se puede jugar con esa persona por ahora. El anfitrión reintenta.
     clearTimeout(p.timer);
     p.mode = 'failed';
@@ -227,7 +258,9 @@ G.Net = (() => {
   // ---------------- envío / recepción ----------------
 
   function relayPush(to, env) {
-    if (!rtdb || !roomId) return;
+    if (!roomId) return;
+    if (srvMode()) { G.Srv.send(env.sig ? { k: 'sig', to, sig: env.sig } : { k: 'q', to, d: env.d }); return; }
+    if (!rtdb) return;
     rtdb.ref('rooms/' + roomId + '/q/' + to).push(JSON.stringify(env)).catch(e => console.warn('[Net] relé:', e.code || e.message));
   }
 
@@ -240,7 +273,7 @@ G.Net = (() => {
     }
     // Sin relé, los datos de la partida no van por la base de datos (se pierden: esa
     // pareja no está conectada). Sólo pasa el aviso de empezar.
-    if (!ALLOW_RELAY && !(msg && msg.k === 'start')) return;
+    if (!allowRelay() && !(msg && msg.k === 'start')) return;
     stats.relaySent++;
     relayPush(to, { f: uid, d: msg });
   }
@@ -254,7 +287,7 @@ G.Net = (() => {
   }
 
   return {
-    open, close, syncMembers, send, toHost, broadcast,
+    open, close, syncMembers, reconnect, send, toHost, broadcast,
     on(fn) { handlers.add(fn); }, off(fn) { handlers.delete(fn); },
     onPeer(fn) { peerHandlers.add(fn); },
     mode(u) { const p = peers.get(u); return p ? p.mode : 'closed'; },

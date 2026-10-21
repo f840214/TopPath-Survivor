@@ -30,6 +30,11 @@
  *     gente jugando, ahorra unas 6 de cada 10 escrituras del ranking.
  *
  * Los periodos se cuentan en hora de España (Europe/Madrid).
+ *
+ * MODO SERVIDOR (red local): nada de esto; el ranking entero vive en
+ * server/lan.js (server/data/ranking.json) y aquí sólo se le pide por /api/
+ * (todas las marcas, sin tope de 50 por tabla, periodos con la hora del
+ * servidor). Sin moderación ni reportes (se apuntan, nada más).
  */
 G.Ranking = (() => {
   const TZ = 'Europe/Madrid';
@@ -46,6 +51,29 @@ G.Ranking = (() => {
   const TTL = 30 * 60 * 1000;            // caché de lo leído (30 min: menos lecturas de Firestore)
 
   const fbx = () => G.DB.online ? G.DB.fb : null;
+  const srvMode = () => G.DB.mode === 'server';
+
+  // ---------------- modo servidor ----------------
+
+  const srvMem = new Map();              // "modo/periodo/dex" -> { at, v }
+  const SRV_TTL = 20 * 1000;
+  /** Una tabla del servidor: { rows, me }. Lo leído vale 20 s. */
+  async function srvBoard(mode, period, dex) {
+    const k = mode + '/' + period + '/' + (dex || 0);
+    const c = srvMem.get(k);
+    if (c && Date.now() - c.at < SRV_TTL) return c.v;
+    const r = await G.DB.api('GET', 'rank/' + mode + '/' + period + (dex && period === 'a' ? '?dex=' + dex : ''));
+    const v = { rows: r.rows || [], me: r.me || null };
+    srvMem.set(k, { at: Date.now(), v });
+    return v;
+  }
+  async function srvSubmit(body) {
+    try {
+      const r = await G.DB.api('POST', 'rank', body);
+      srvMem.clear();
+      return r.better || [];
+    } catch (e) { console.warn('[Ranking] servidor:', e.message); return []; }
+  }
 
   // ---------------- periodos ----------------
 
@@ -174,7 +202,7 @@ G.Ranking = (() => {
   let busy = Promise.resolve(), runMarked = '';
   function runStarted(mode) {
     const fb = fbx();
-    if (!fb || runMarked === fb.uid) return;
+    if (srvMode() || !fb || runMarked === fb.uid) return;
     runMarked = fb.uid;
     const go = n => fb.fs.collection('runs').doc(fb.uid).set({ startedAt: now(), mode })
       .catch(e => {
@@ -261,6 +289,12 @@ G.Ranking = (() => {
 
   function submitSolo(r) { return track(submitSoloNow(r)); }
   async function submitSoloNow(r) {
+    if (srvMode()) {
+      if (!G.DB.online || r.t < MIN_T) return [];
+      const better = await srvSubmit({ mode: 's', t: r.t, lv: r.lv, kills: r.kills, dex: r.dex, shiny: !!r.shiny });
+      announce(better);
+      return better;
+    }
     const fb = fbx();
     if (!fb || !G.Social.me || r.t < MIN_T) return [];
     const ids = boardIds();
@@ -275,6 +309,13 @@ G.Ranking = (() => {
   /** La sube el anfitrión, con todo el equipo. */
   function submitGroup(r) { return track(submitGroupNow(r)); }
   async function submitGroupNow(r) {
+    if (srvMode()) {
+      if (!G.DB.online || r.t < MIN_T || !r.members || r.members.length < 2) return [];
+      const better = await srvSubmit({ mode: 'g', t: r.t, lv: r.lv, kills: r.kills,
+        members: r.members.map(m => ({ uid: m.uid, dex: m.dex, shiny: !!m.shiny })) });
+      announce(better);
+      return better;
+    }
     const fb = fbx();
     if (!fb || r.t < MIN_T || !r.members || r.members.length < 2) return [];
     const ms = r.members.slice().sort((a, b) => (a.uid < b.uid ? -1 : 1));
@@ -312,6 +353,8 @@ G.Ranking = (() => {
    * @param friendsOnly  sólo tú y tus amigos
    */
   async function top(mode, period, dex, friendsOnly) {
+    // Servidor: todos los jugadores de la red son amigos, así que "sólo amigos" es lo mismo.
+    if (srvMode()) return G.DB.online ? (await srvBoard(mode, period, dex)).rows : [];
     const fb = fbx();
     if (!fb) return [];
     const b = board(mode, period, dex);
@@ -342,6 +385,7 @@ G.Ranking = (() => {
 
   /** Tu puesto en la tabla (aunque no salgas en el top). → { pos, t, row } | null */
   async function myRank(mode, period, dex) {
+    if (srvMode()) return G.DB.online ? (await srvBoard(mode, period, dex)).me : null;
     const fb = fbx();
     if (!fb) return null;
     const b = board(mode, period, dex);
@@ -401,7 +445,7 @@ G.Ranking = (() => {
   /** Al borrar la cuenta: quita tus filas de los resúmenes que conoce este navegador. */
   async function removeMine() {
     const fb = fbx();
-    if (!fb) return;
+    if (srvMode() || !fb) return;
     const ids = boardIds();
     const boards = new Set();
     for (const m of ['s', 'g']) for (const [p] of PERIODS) boards.add(m + '_' + ids[p]);
@@ -424,13 +468,22 @@ G.Ranking = (() => {
   // ---------------- reportes y moderación ----------------
 
   /** Reporta una marca sospechosa (una vez por marca y jugador). → true si se ha enviado */
-  const repKey = () => 'ps.rk.rep.' + (fbx() ? fbx().uid : '');
+  const repKey = () => 'ps.rk.rep.' + (srvMode() ? G.DB.key || '' : fbx() ? fbx().uid : '');
   function reported() { try { return new Set(JSON.parse(localStorage.getItem(repKey()) || '[]')); } catch (e) { return new Set(); } }
   async function report(b, row) {
-    const fb = fbx();
-    if (!fb) return false;
     const key = b + '__' + row.id;
     const done = reported();
+    if (srvMode()) {
+      if (!G.DB.online) return false;
+      if (!done.has(key)) {
+        await G.DB.api('POST', 'rank/report', { board: b, id: row.id }).catch(() => {});
+        done.add(key);
+        try { localStorage.setItem(repKey(), JSON.stringify([...done].slice(-300))); } catch (e) { /* lleno */ }
+      }
+      return true;
+    }
+    const fb = fbx();
+    if (!fb) return false;
     if (!done.has(key)) {
       // (Si ya lo habías reportado desde otro ordenador, el servidor no deja repetirlo: da igual.)
       await fb.fs.collection('reports').doc(key + '__' + fb.uid)

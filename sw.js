@@ -5,7 +5,7 @@
  *   (se van guardando según se usan: no se descarga todo de golpe).
  * - Firebase y demás servicios de fuera no se tocan.
  */
-const CODE = 'ps-code-v1', ART = 'ps-art-v1';
+const CODE = 'ps-code-v1', ART = 'ps-art-v2';   // art-v2: los sprites de los personajes propios se redibujaron (16-10-2026)
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CODE).then(c => c.addAll(['./', './index.html', './css/style.css', './manifest.webmanifest'])).catch(() => {}));
@@ -22,6 +22,7 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;
+  if (url.pathname.startsWith('/api/')) return;      // servidor de red local: nunca en caché
   const art = /\/assets\/(pokemon|icons|fonts)\//.test(url.pathname);
   if (art) {
     e.respondWith(caches.open(ART).then(async c => {

@@ -12,6 +12,8 @@ G.AchDefs = (() => {
   const legends = s => Object.keys(s.legends || {}).length;
   const st = k => s => (s.stats && s.stats[k]) || 0;
   const count = k => s => Object.keys(s[k] || {}).length;
+  // Amistad más alta con un solo Pokémon (1 punto cada 10 partidas, ver G.DB.friendship).
+  const bestFriend = s => Math.min(100, Math.max(0, ...Object.values(s.pruns || {}).map(n => Math.floor((n || 0) / 10))));
 
   const CATS = [['coleccion', 'Colección'], ['supervivencia', 'Supervivencia'], ['combate', 'Combate'],
                 ['grietas', 'Grietas'], ['legendarios', 'Legendarios'], ['otros', 'Misiones y más']];
@@ -28,6 +30,9 @@ G.AchDefs = (() => {
     { id: 'shiny1', cat: 'coleccion', tier: 1, name: 'Algo brilla', desc: 'Consigue 1 shiny.', value: shinies, goal: 1, reward: { t1: 3 }, title: 'Brillante' },
     { id: 'shiny5', cat: 'coleccion', tier: 2, name: 'Ojo para el brillo', desc: 'Consigue 5 shinies.', value: shinies, goal: 5, reward: { t10: 1 } },
     { id: 'shiny20', cat: 'coleccion', tier: 3, name: 'Cazashinies', desc: 'Consigue 20 shinies.', value: shinies, goal: 20, reward: { t10: 2 }, title: 'Cazashinies' },
+    { id: 'friend10', cat: 'coleccion', tier: 1, name: 'Buenos amigos', desc: 'Llega a 10 de amistad con un Pokémon.', value: bestFriend, goal: 10, reward: { t1: 3 } },
+    { id: 'friend50', cat: 'coleccion', tier: 2, name: 'Inseparables', desc: 'Llega a 50 de amistad con un Pokémon.', value: bestFriend, goal: 50, reward: { t10: 1 }, title: 'Inseparable' },
+    { id: 'friend100', cat: 'coleccion', tier: 3, name: 'Alma gemela', desc: 'Llega a 100 de amistad con un Pokémon.', value: bestFriend, goal: 100, reward: { t10: 3 }, title: 'Alma gemela' },
     { id: 'pulls100', cat: 'coleccion', tier: 2, name: 'Tragaperras', desc: 'Haz 100 tiradas en el gacha.', value: st('pulls'), goal: 100, reward: { t10: 1 }, title: 'Afortunado' },
 
     // ---------- supervivencia ----------

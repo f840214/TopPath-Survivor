@@ -178,8 +178,9 @@
       box.appendChild(sel);
       if (!titles.length) box.insertAdjacentHTML('beforeend', '<p class="note">Consigue logros para desbloquear títulos.</p>');
 
+      box.insertAdjacentHTML('beforeend', '<div style="height:16px"></div>');
       const prev = document.createElement('button');
-      prev.className = 'btn gold'; prev.style.marginTop = '16px';
+      prev.className = 'btn gold'; prev.style.display = 'inline-block';
       prev.textContent = 'Ver mi perfil público';
       prev.onclick = () => G.ProfileUI.showData(G.Social.profileData());
       box.appendChild(prev);

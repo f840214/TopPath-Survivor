@@ -1,4 +1,4 @@
-/* ============ i18n.js — idiomas (español / inglés) ============
+/* ============ i18n.js — idiomas (español / inglés / chino tradicional) ============
  * El juego está escrito en español. Si el idioma es inglés, todo texto que
  * se enseña se traduce con el diccionario de js/data/lang-en.js, sin tener que
  * tocar cada pantalla:
@@ -22,8 +22,9 @@ G.I18n = (() => {
   try { saved = localStorage.getItem(KEY); } catch (e) { /* nada */ }
   const byPath = /\/en(\/|$)/.test(location.pathname) ? 'en' : null;
   const nav = ((navigator.languages && navigator.languages[0]) || navigator.language || 'es').toLowerCase();
-  const lang = saved === 'es' || saved === 'en' ? saved : byPath || (nav.startsWith('es') ? 'es' : 'en');
-  document.documentElement.lang = lang;
+  // 'zh' = chino tradicional (js/data/lang-zh.js, del parche de la comunidad).
+  const lang = saved === 'es' || saved === 'en' || saved === 'zh' ? saved : byPath || (nav.startsWith('es') ? 'es' : nav.startsWith('zh') ? 'zh' : 'en');
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hant' : lang;
 
   const exact = new Map(), exactLow = new Map();
   let patterns = [], frag = null, fragLow = null, fragMap = new Map();
@@ -31,8 +32,9 @@ G.I18n = (() => {
   const L = '\\p{L}\\p{N}';
   const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-  /** Añade traducciones { 'texto en español': 'English text' }. */
-  function add(dict) {
+  /** Añade traducciones { 'texto en español': 'texto traducido' } del idioma `forLang` (sólo se cargan las del idioma activo). */
+  function add(dict, forLang = 'en') {
+    if (forLang !== lang) return;
     const fr = [];
     for (const [es, en] of Object.entries(dict)) {
       if (!en || es === en) continue;
@@ -96,16 +98,35 @@ G.I18n = (() => {
   /** Texto con huecos para el código: T('Nivel {x}', 5). */
   function f(es, ...vals) { let i = 0; return t(es).replace(/\{x\}/g, () => vals[i++]); }
 
+  // ---------------- chino: casos que dependen de dónde sale el texto ----------------
+  const ZH = lang === 'zh';
+  const ZH_MOVE_CTX = '.card .nm, #scr-bond .ds, #bond-sub, .move-icons, #starter-info, #dex-detail p, #over-stats b, .bind-slots option, .ban-moves button';
+  const ZH_TYPE_CTX = '.type-chip, .type, .tag-chip';
+  const ZH_TYPES = new Set(['一般', '火', '水', '電', '草', '冰', '格鬥', '毒', '地面', '飛行', '超能力', '蟲', '岩石', '幽靈', '龍', '惡', '鋼', '妖精']);
+  const zhMove = s => s.replace(/(?<![\p{L}\p{N}])Psíquico(?![\p{L}\p{N}])/gu, '精神強念');
+  /** Traduce un texto según el elemento en que está (sólo cambia algo en chino). */
+  function tIn(s, el) {
+    if (!ZH || !el || !el.closest) return t(s);
+    const r = t(el.closest(ZH_TYPE_CTX) ? s : el.closest(ZH_MOVE_CTX) ? zhMove(s) : s);
+    const body = r.trim();
+    return el.closest(ZH_TYPE_CTX) && ZH_TYPES.has(body) ? r.replace(body, body + '系') : r;
+  }
+
   // ---------------- DOM ----------------
   const ATTRS = ['placeholder', 'title', 'alt', 'aria-label'];
-  const skipEl = el => !!(el && el.closest && el.closest('[translate="no"], script, style, code'));
+  // En chino sí se traducen las novedades (van en español e inglés con translate="no"; el diccionario las tiene).
+  const skipEl = el => {
+    if (!el || !el.closest) return false;
+    const p = el.closest('[translate="no"], script, style, code');
+    return !!p && !(ZH && p.classList && p.classList.contains('news-day'));
+  };
 
   function doText(n) {
     const p = n.parentElement;
     if (!p || skipEl(p)) return;
     const v = n.nodeValue;
     if (n.__tr === v) return;
-    const r = t(v);
+    const r = tIn(v, p);
     n.__tr = r;
     if (r !== v) n.nodeValue = r;
   }
@@ -113,7 +134,7 @@ G.I18n = (() => {
     if (skipEl(el)) return;
     for (const a of ATTRS) {
       const v = el.getAttribute && el.getAttribute(a);
-      if (v) { const r = t(v); if (r !== v) el.setAttribute(a, r); }
+      if (v) { const r = tIn(v, el); if (r !== v) el.setAttribute(a, r); }
     }
   }
   function walk(root) {
@@ -128,7 +149,7 @@ G.I18n = (() => {
   function startDom() {
     if (lang === 'es') return;
     // Los enlaces a las páginas de la web, a su versión en inglés.
-    const EN_LINKS = { 'guia/': 'en/guide/', 'pokedex/': 'en/pokedex/' };
+    const EN_LINKS = lang === 'en' ? { 'guia/': 'en/guide/', 'pokedex/': 'en/pokedex/' } : {};
     document.querySelectorAll('a[href]').forEach(a => { const h = a.getAttribute('href'); if (EN_LINKS[h]) a.setAttribute('href', EN_LINKS[h]); });
     walk(document.body);
     new MutationObserver(ms => {
@@ -144,9 +165,18 @@ G.I18n = (() => {
   // ---------------- canvas y ventanas del navegador ----------------
   if (lang !== 'es') {
     const P = CanvasRenderingContext2D.prototype;
+    // La fuente pixel no tiene caracteres chinos: en chino se dibuja con la del sistema.
+    const ZH_FONT = '"PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif';
     for (const k of ['fillText', 'strokeText', 'measureText']) {
       const orig = P[k];
-      P[k] = function (s, ...a) { return orig.call(this, typeof s === 'string' ? t(s) : s, ...a); };
+      P[k] = ZH
+        ? function (s, ...a) {
+            const font = this.font;
+            if (font.includes('Pixelify')) this.font = font.replace(/Pixelify/g, ZH_FONT);
+            try { return orig.call(this, typeof s === 'string' ? t(/^Psíquico( \+\d+)?$/.test(s.trim()) ? zhMove(s) : s) : s, ...a); }
+            finally { this.font = font; }
+          }
+        : function (s, ...a) { return orig.call(this, typeof s === 'string' ? t(s) : s, ...a); };
     }
     const oc = window.confirm, oa = window.alert;
     window.confirm = s => oc.call(window, t(s));

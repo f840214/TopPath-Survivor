@@ -154,7 +154,7 @@ G.Enemies = (() => {
     }
     const used = new Set();
     bosses = BOSS_SLOTS.map(slot => {
-      const ok = p => !p.leg && G.SPRITE_META[p.dex] && !used.has(p.dex);
+      const ok = p => !p.leg && !p.custom && G.SPRITE_META[p.dex] && !used.has(p.dex);
       let pool = G.DEX.filter(p => ok(p) && p.bst >= slot.bst[0] && p.bst <= slot.bst[1]);
       if (!pool.length) pool = G.DEX.filter(p => ok(p) && p.bst >= 580);
       const p = G.U.pick(pool);

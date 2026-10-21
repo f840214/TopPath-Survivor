@@ -76,10 +76,10 @@ G.RunUI = (() => {
   function setWaiting(names) {
     const me = G.Social.me ? G.Social.me.name : '';
     const others = names.filter(n => n !== me);
-    const list = a => a.length > 1 ? a.slice(0, -1).join(', ') + ' y ' + a[a.length - 1] : a[0];
+    const list = a => a.length > 1 ? a.slice(0, -1).join(', ') + (G.I18n.lang === 'zh' ? '和' : ' y ') + a[a.length - 1] : a[0];
     $('lvl-wait').textContent = !names.length ? ''
       : !others.length ? 'Elige tu carta'
-      : names.includes(me) ? 'Faltan por elegir: ' + list([...others, 'tú'])
+      : names.includes(me) ? 'Faltan por elegir: ' + list([...others, G.T('tú')])
       : 'Esperando a ' + list(others) + '…';
   }
 
@@ -103,12 +103,15 @@ G.RunUI = (() => {
   }
 
   function showOver(r, onBack) {
-    $('over-title').textContent = r.dead ? 'Has caído…' : 'Run terminada';
+    $('over-title').textContent = r.teams ? (r.teams[0] && r.teams[0].team === r.myTeam ? '¡Tu equipo ha ganado!' : 'Enfrentamiento terminado')
+      : r.dead ? 'Has caído…' : 'Run terminada';
     $('over-stats').innerHTML = `
       <div><span>Tiempo</span><b>${G.U.mmss(r.time)}</b></div>
       <div><span>Nivel</span><b>${r.level}</b></div>
       <div><span>Derrotados</span><b>${r.kills}</b></div>
       <div><span>Jefes</span><b>${r.bosses}</b></div>
+      ${r.teams ? `<div style="grid-column:1/-1"><span>Enfrentamiento</span><b style="font-size:15px">${r.teams.map((t, i) =>
+        `<span style="color:${G.Coop.TEAM_COLORS[t.team - 1]}">${i === 0 ? '🏆 ' : ''}${G.I18n.f('Equipo {x}', t.team)}${t.team === r.myTeam ? ' (' + G.T('tú') + ')' : ''}: ${G.I18n.f('{x} bajas', t.kills)} · ${G.I18n.f('Nv.{x}', t.level)}</span>`).join('<br>')}</b></div>` : ''}
       ${r.judge ? `<div style="grid-column:1/-1"><span>Ante Arceus</span><b class="gold">${G.U.mmss(r.judge.time)} · ${r.judge.bosses} ${r.judge.bosses === 1 ? 'legendario' : 'legendarios'}</b></div>` : ''}
       <div style="grid-column:1/-1"><span>Pokémonedas ganadas</span>
         <b class="gold"><span class="coin"></span> +${r.coins}</b>
@@ -120,7 +123,7 @@ G.RunUI = (() => {
       ${r.caught && r.caught.length ? `<div style="grid-column:1/-1" class="caught"><span>${G.Icons.html('shiny', 12)} Shinies conseguidos</span>
         <div class="caught-row" id="over-caught"></div></div>` : ''}
       ${r.record ? '<div style="grid-column:1/-1;text-align:center" class="gold">¡Nuevo récord de tiempo!</div>' : ''}
-      ${askSupport(r) ? `<div class="support-ask" id="over-ask" style="grid-column:1/-1">
+      ${askSupport(r) && G.DB.mode !== 'server' ? `<div class="support-ask" id="over-ask" style="grid-column:1/-1">
         <button class="x" type="button" aria-label="Cerrar">×</button>
         <p>¿Te está gustando PokéSurvivor? Lo hago yo solo y los servidores cuestan dinero. Si quieres, puedes ayudarme a mantenerlo en línea.</p>
         <a class="btn small gold" href="${G.Funding.url}" target="_blank" rel="noopener">${G.Icons.html('heart', 14)} Apoyar en Ko-fi</a>
@@ -225,12 +228,22 @@ G.RunUI = (() => {
     G.UI.soundControls($('pause-sound'));
     $('pause-coop').classList.toggle('hidden', !coop);
     $('btn-quit').textContent = coop ? 'Salir de la partida' : 'Abandonar run';
+    const p = G.Game.player;
+    $('btn-unequip').classList.toggle('hidden', !(p && p.item));
     G.UI.show('scr-pause');
   }
 
   function wirePause(onResume, onQuit) {
     $('btn-resume').onclick = onResume;
     $('btn-quit').onclick = onQuit;
+    // Quitarse el objeto equipado (antes sólo se podía cambiar por otro).
+    $('btn-unequip').onclick = () => {
+      const p = G.Game.player;
+      if (!p || !p.item) return;
+      p.equip(null);
+      $('btn-unequip').classList.add('hidden');
+      G.UI.toast('Objeto quitado');
+    };
   }
 
   return { showLevelUp, reroll, showItemChoice, showBond, pickBond, bondBack, pick, setWaiting, closeLevelUp, showOver, wirePause, showPause };

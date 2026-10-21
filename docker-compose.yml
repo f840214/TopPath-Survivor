@@ -1,0 +1,12 @@
+services:
+  pokesurvivor:
+    build: .
+    container_name: pokesurvivor
+    ports:
+      - "8877:8877"          # 左邊改成想對外開的埠
+    volumes:
+      - pokesurvivor-data:/app/server/data   # 帳號、存檔、排行榜
+    restart: unless-stopped
+
+volumes:
+  pokesurvivor-data:

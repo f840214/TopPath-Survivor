@@ -75,7 +75,7 @@ G.SettingsUI = (() => {
     } else if (tab === 'gfx') {
       const auto = ['baja', 'media', 'alta'][G.Settings.autoLevel];
       box.innerHTML = section('Idioma', 'El juego se recarga al cambiarlo.')
-        + `<div class="chips set-chips" translate="no">${[['es', 'Español'], ['en', 'English']].map(([v, l]) =>
+        + `<div class="chips set-chips" translate="no">${[['es', 'Español'], ['en', 'English'], ['zh', '繁體中文']].map(([v, l]) =>
              `<button class="chip ${G.I18n.lang === v ? 'on' : ''}" data-lang="${v}">${l}</button>`).join('')}</div>`
         + section('Calidad', 'Cuántos efectos y partículas se dibujan. <b>Auto</b> la baja sola si el juego va a tirones (ahora: ' + auto + ').')
         + choice('quality', [['auto', 'Auto'], ['high', 'Alta'], ['mid', 'Media'], ['low', 'Baja']])
@@ -112,11 +112,11 @@ G.SettingsUI = (() => {
              <li><b>Fuente:</b> Pixelify Sans (OFL).</li>
            </ul>`
         + `<div class="row wrap" style="justify-content:center;gap:8px">
-             ${window.PS_PAGES ? `<a class="btn small" href="${G.I18n.lang === 'en' ? 'en/guide/' : 'guia/'}" target="_blank">Guía y preguntas</a>
+             ${window.PS_PAGES && G.DB.mode !== 'server' ? `<a class="btn small" href="${G.I18n.lang === 'en' ? 'en/guide/' : 'guia/'}" target="_blank">Guía y preguntas</a>
              <a class="btn small" href="${G.I18n.lang === 'en' ? 'en/pokedex/' : 'pokedex/'}" target="_blank">Pokédex</a>` : ''}
              <button class="btn small" data-legal>Aviso legal y privacidad</button>
              <a class="btn small" href="contacto/" target="_blank" rel="noopener">Contacto</a>
-             <a class="btn small" href="${REPO}" target="_blank" rel="noopener">Código (GitHub)</a>
+             ${G.DB.mode === 'server' ? '' : `<a class="btn small" href="${REPO}" target="_blank" rel="noopener">Código (GitHub)</a>`}
            </div>`;
     }
     wire(box);
@@ -124,7 +124,7 @@ G.SettingsUI = (() => {
 
   function renderAccount(box) {
     const st = G.DB.guest ? 'guest' : G.DB.syncState;
-    const SYNC = { ok: 'Guardado en la nube', syncing: 'Guardando…', pending: 'Pendiente de subir (se sube al salir del juego)',
+    const SYNC = { ok: G.DB.mode === 'server' ? 'Guardado en el servidor' : 'Guardado en la nube', syncing: 'Guardando…', pending: 'Pendiente de subir (se sube al salir del juego)',
                    offline: 'Sin conexión: se subirá al volver', local: 'Guardado sólo en este navegador', guest: 'Invitado: no se guarda' };
     if (G.DB.guest) {
       box.innerHTML = section('Cuenta', 'Estás jugando como <b>invitado</b>: tu progreso no se guarda al salir.')
@@ -132,7 +132,7 @@ G.SettingsUI = (() => {
       return;
     }
     const nick = G.Social.me ? G.Social.me.name : (G.DB.user || '');
-    const kind = G.DB.mode === 'local' ? 'Cuenta de este navegador' : G.DB.nameAccount ? 'Nombre y contraseña' : 'Google';
+    const kind = G.DB.mode === 'local' ? 'Cuenta de este navegador' : G.DB.mode === 'server' ? 'Cuenta del servidor de la red' : G.DB.nameAccount ? 'Nombre y contraseña' : 'Google';
     box.innerHTML = section('Cuenta')
       + `<div class="set-row"><div class="grow"><b>Apodo</b><small>Es único y no se puede cambiar.</small></div><span class="gold" translate="no">${esc(nick)}</span></div>`
       + `<div class="set-row"><div class="grow"><b>Tipo de cuenta</b></div><span>${esc(kind)}</span></div>`

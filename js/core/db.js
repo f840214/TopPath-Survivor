@@ -1,8 +1,16 @@
-/* ============ db.js — base de datos: Firebase (nube) o local ============
+/* ============ db.js — base de datos: servidor local, Firebase (nube) o local ============
  * TODO el acceso a datos persistentes pasa por aquí. El resto del juego sólo
  * usa G.DB.*.
  *
- * Dos modos (se decide en ready()):
+ * Tres modos (se decide en ready(), en este orden):
+ *
+ *   SERVIDOR (red local, server/server.js)
+ *     Si la página la sirve nuestro propio servidor de Node (responde en
+ *     /api/ping). Las cuentas y las partidas se guardan en el disco de ese
+ *     ordenador (server/data/) y se entra desde cualquier aparato de la red,
+ *     sin internet. Sesión con token en ps.token; copia local en ps.srv.<clave>
+ *     que se fusiona con la del servidor al entrar (igual que en la nube).
+ *     Sin ranking, amigos ni cooperativo (necesitan Firebase).
  *
  *   NUBE  (Firebase Authentication + Cloud Firestore)
  *     Si hay configuración en js/core/firebase-config.js y el juego se abre
@@ -27,12 +35,13 @@
 G.DB = (() => {
   const K_ACC = 'ps.accounts', K_SES = 'ps.session', K_SAVE = 'ps.save.';
   const K_CLOUD = 'ps.cloud.', K_MIGRATED = 'ps.migrated.';
+  const K_TOKEN = 'ps.token', K_SRV = 'ps.srv.';
   const VERSION = 3;
-  const START_COINS = 500;
+  const START_COINS = 300000;      // red local: se empieza con mucho para probarlo todo (era 500)
   const SDK = 'https://www.gstatic.com/firebasejs/13.0.0/';
   const NAME_DOMAIN = 'jugadores.pokesurvivor.net';   // sólo para el email interno
 
-  let mode = 'local';       // 'cloud' | 'local'
+  let mode = 'local';       // 'server' | 'cloud' | 'local'
   let localReason = '';     // por qué no hay nube: 'file' | 'config' | 'error'
   let user = null;          // nombre visible
   let key = null;           // clave local (minúsculas) o uid de Firebase
@@ -81,6 +90,7 @@ G.DB = (() => {
       personality: null,      // { trait, scores }
       upgrades: {},           // (antiguo) mejoras de la cuenta; ahora van por Pokémon
       pupg: {},               // dex -> { id -> nivel }: mejoras de cada Pokémon
+      pruns: {},              // dex -> partidas jugadas con él (amistad: 1 punto cada 10, tope 100)
       tickets: { t1: 0, t10: 0 },   // tickets del gacha (x1 y x10)
       pity: {},               // generación del banner -> tiradas sin ★5
       legends: {},            // dex -> fecha: legendarios vencidos en grietas
@@ -148,6 +158,8 @@ G.DB = (() => {
         s.pban[d] = [...new Set(l.filter(id => typeof id === 'string' && (!G.Moves || G.Moves.BY_ID[id])))].slice(0, 3);
       }
     } else s.pban = {};
+    if (!s.pruns || typeof s.pruns !== 'object') s.pruns = {};
+    for (const d of Object.keys(s.pruns)) s.pruns[d] = n(s.pruns[d]);
     if (G.Upgrades) for (const d of Object.keys(s.pupg || {})) {
       const u = s.pupg[d];
       if (!u || typeof u !== 'object') { delete s.pupg[d]; continue; }
@@ -185,6 +197,8 @@ G.DB = (() => {
       for (const k in older.pupg[d]) mine[k] = Math.max(mine[k] || 0, older.pupg[d][k]);
     }
     r.pupgDone = r.pupgDone || older.pupgDone;
+    r.pruns = r.pruns || {};
+    for (const d in older.pruns || {}) r.pruns[d] = Math.max(r.pruns[d] || 0, older.pruns[d] || 0);
     // Lo conseguido nunca se pierde: unión de legendarios, arenas, objetos, logros...
     for (const coll of ['legends', 'arenas', 'itemsFound', 'evoMoves', 'ach']) {
       r[coll] = r[coll] || {};
@@ -303,6 +317,102 @@ G.DB = (() => {
     if (acc.hash !== await hash(pass || '', acc.salt)) return null;
     const s = read(K_SAVE + k);
     return s ? { key: k, save: migrate(s, acc.name) } : null;
+  }
+
+  // =====================================================================
+  //                        MODO SERVIDOR (red local)
+  // =====================================================================
+
+  const API = '/api/';
+  let token = null;
+
+  /** Llamada al servidor. Lanza { code, message } si falla (como Firebase). */
+  async function api(method, route, body, opts = {}) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = 'Bearer ' + token;
+    let res;
+    try {
+      res = await fetch(API + route, { method, headers, body: body ? JSON.stringify(body) : undefined,
+                                       cache: 'no-store', keepalive: !!opts.keepalive, signal: opts.signal });
+    } catch (e) { throw { code: 'unavailable', message: 'Sin conexión con el servidor.' }; }
+    let data = null;
+    try { data = await res.json(); } catch (e) { /* respuesta vacía */ }
+    if (!res.ok) throw { code: res.status === 401 ? 'auth' : 'server', status: res.status, message: (data && data.error) || ('Error ' + res.status) };
+    return data || {};
+  }
+
+  /** ¿Nos sirve server/server.js? Se pregunta una vez, con tope de 3 s. */
+  async function initServer() {
+    if (!/^https?:$/.test(location.protocol)) return false;
+    const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    const t = setTimeout(() => ctl && ctl.abort(), 3000);
+    try {
+      const r = await api('GET', 'ping', null, { signal: ctl && ctl.signal });
+      return r && r.ps === 1;
+    } catch (e) { return false; }
+    finally { clearTimeout(t); }
+  }
+
+  /** Abre la partida que manda el servidor (login, registro o sesión recuperada). */
+  function openServer(r) {
+    key = r.key; user = r.name; guest = false; uid = null;
+    const cached = read(K_SRV + key);
+    let s = merge(cached && migrate(cached), r.save && migrate(r.save));
+    if (!s) s = newSave(r.name);
+    save = migrate(s, s.name);
+    user = save.name;
+    write(K_SRV + key, save);
+    try { localStorage.setItem(K_TOKEN, token); } catch (e) { /* nada */ }
+    lastPush = Date.now();
+    const same = r.save && (!cached || (cached.updated || 0) <= (r.save.updated || 0));
+    if (same) setSync('ok'); else pushNow();
+  }
+
+  async function restoreServer() {
+    try { token = localStorage.getItem(K_TOKEN) || null; } catch (e) { token = null; }
+    if (!token) return false;
+    try { openServer(await api('GET', 'session')); return true; }
+    catch (e) {
+      if (e.code === 'auth') { token = null; remove(K_TOKEN); return false; }
+      // Servidor caído justo ahora: se entra con la copia de este navegador y se subirá al volver.
+      console.warn('[DB] servidor sin responder:', e.message);
+      return false;
+    }
+  }
+
+  async function authServer(route, name, pass) {
+    try {
+      const r = await api('POST', route, { name, pass });
+      token = r.token;
+      openServer(r);
+      return { ok: true, isNew: !save.partner };
+    } catch (e) { return { ok: false, error: e.message || 'Sin conexión con el servidor.' }; }
+  }
+
+  /** Sube la partida al servidor; éste devuelve la copia que se queda y se fusiona. */
+  function pushServer(opts = {}) {
+    if (pushing) { pending = true; return pushing.then(() => (pending ? pushNow() : undefined)); }
+    clearTimeout(pushT); pushT = 0; pushDue = 0;
+    pending = false;
+    lastPush = Date.now();
+    setSync('syncing');
+    let failed = false;
+    pushing = api('PUT', 'save', { save: plain(save) }, opts).then(r => {
+      fails = 0;
+      if (r.save && save) { applyInPlace(merge(plain(save), migrate(r.save))); write(K_SRV + key, save); }
+      setSync(pending ? 'pending' : 'ok');
+      if (G.UI && G.UI.refreshCoins) G.UI.refreshCoins();
+    }).catch(e => {
+      console.warn('[DB] no se pudo guardar en el servidor:', e.message);
+      pending = true; failed = true;
+      if (e.code === 'auth') { setSync('pending'); return; }   // sesión caducada: queda la copia local
+      setSync('offline');
+      scheduleRetry();
+    }).finally(() => {
+      pushing = null;
+      if (!failed && pending && syncState === 'pending') schedulePush(1500);
+    });
+    return pushing;
   }
 
   // =====================================================================
@@ -442,7 +552,8 @@ G.DB = (() => {
   const sinceOk = () => Date.now() - (+read(K_OK + uid) || 0);
 
   /** Sube la partida fusionándola con lo que haya en la nube (transacción). */
-  function pushNow() {
+  function pushNow(opts) {
+    if (mode === 'server') return (guest || !save || !key) ? Promise.resolve() : pushServer(opts);
     if (mode !== 'cloud' || guest || !save || !uid) return Promise.resolve();
     // Si ya hay una subida en marcha, se hace otra justo después (para lo que haya cambiado mientras).
     if (pushing) { pending = true; return pushing.then(() => (pending ? pushNow() : undefined)); }
@@ -551,6 +662,13 @@ G.DB = (() => {
   function ready() {
     if (readyP) return readyP;
     readyP = (async () => {
+      if (await initServer()) {
+        mode = 'server';
+        addEventListener('online', () => { if (pending) pushNow(); });
+        addEventListener('pagehide', () => { if (pending) pushNow({ keepalive: true }); });
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && pending) pushNow({ keepalive: true }); });
+        return restoreServer();
+      }
       try { if (await initCloud()) mode = 'cloud'; }
       catch (e) { console.warn('[DB] sin nube:', e.message); localReason = 'error'; mode = 'local'; }
       if (mode === 'local') { setSync('local'); return restoreLocal(); }
@@ -562,12 +680,24 @@ G.DB = (() => {
     return readyP;
   }
 
-  async function register(name, pass) {
+  /** Da todos los Pokémon de la Pokédex (opción al crear cuenta en el servidor de red local). */
+  function grantAll() {
+    if (!save) return;
+    for (const p of G.DEX) if (!save.owned[p.dex]) save.owned[p.dex] = { at: Date.now(), from: 'start' };
+    commit(true);
+  }
+
+  async function register(name, pass, opts = {}) {
     name = (name || '').trim();
     if (!VALID.test(name)) return { ok: false, error: 'El nombre debe tener 3-16 letras, números o _.' };
     const min = mode === 'cloud' ? 6 : 4;
     if ((pass || '').length < min) return { ok: false, error: `La contraseña debe tener al menos ${min} caracteres.` };
     if (mode === 'local') return registerLocal(name, pass);
+    if (mode === 'server') {
+      const r = await authServer('register', name, pass);
+      if (r.ok && opts.allMons) grantAll();
+      return r;
+    }
     // Tope de cuentas del mes (Firebase cobra a partir de 50.000 al mes).
     if (G.Signups && !(await G.Signups.check())) return { ok: false, error: 'Este mes ya no quedan plazas para cuentas nuevas (vuelven el 1 de ' + G.Signups.nextMonthName() + '). Mientras, puedes jugar como invitado.' };
     try {
@@ -582,6 +712,7 @@ G.DB = (() => {
   async function login(name, pass) {
     name = (name || '').trim();
     if (mode === 'local') return loginLocal(name, pass);
+    if (mode === 'server') return authServer('login', name, pass);
     try {
       const legacy = await legacySave(name, pass);
       const cred = await auth.signInWithEmailAndPassword(nameToEmail(name), pass || '');
@@ -617,6 +748,7 @@ G.DB = (() => {
     user = 'Invitado'; key = null; guest = true; uid = null;
     save = newSave('Invitado');
     if (mode === 'local') remove(K_SES);
+    if (mode === 'server') { token = null; remove(K_TOKEN); }
     return { ok: true, isNew: true };
   }
 
@@ -630,6 +762,14 @@ G.DB = (() => {
     if (guest || !key || !save) return false;
     save.updated = Date.now();
     if (mode === 'local') return write(K_SAVE + key, save);
+    if (mode === 'server') {
+      // Es nuestro servidor en la red local: guardar sale gratis, a los pocos segundos.
+      write(K_SRV + key, save);
+      pending = true;
+      setSync('pending');
+      schedulePush(urgent ? 1000 : 5000);
+      return true;
+    }
     write(K_CLOUD + uid, save);
     pending = true;
     setSync('pending');
@@ -647,16 +787,23 @@ G.DB = (() => {
       if (pending) { try { await pushNow(); } catch (e) { /* queda la copia local */ } }
       stopListening();
       try { await auth.signOut(); } catch (e) { /* nada */ }
+    } else if (mode === 'server' && !guest && save) {
+      if (pending) { try { await pushNow(); } catch (e) { /* queda la copia local */ } }
+      try { await api('POST', 'logout'); } catch (e) { /* nada */ }
+      token = null; remove(K_TOKEN);
     } else if (mode === 'local' && !guest) {
       commit();
       remove(K_SES);
     }
     clearTimeout(pushT); clearTimeout(retryT);
     user = key = save = uid = null; guest = false; pending = false;
-    setSync(mode === 'cloud' ? 'ok' : 'local');
+    setSync(mode === 'local' ? 'local' : 'ok');
   }
 
-  function nameAccount() { return !!(auth && auth.currentUser && (auth.currentUser.email || '').endsWith('@' + NAME_DOMAIN)); }
+  function nameAccount() {
+    if (mode === 'server') return !guest && !!key;
+    return !!(auth && auth.currentUser && (auth.currentUser.email || '').endsWith('@' + NAME_DOMAIN));
+  }
 
   /*
    * Recuperar la cuenta: las de nombre y contraseña no tienen correo de verdad
@@ -670,7 +817,7 @@ G.DB = (() => {
     return !!(u && u.providerData.some(p => p.providerId === 'google.com'));
   }
   async function linkGoogle() {
-    if (!auth || !auth.currentUser) return { ok: false, error: 'Inicia sesión primero.' };
+    if (mode !== 'cloud' || !auth || !auth.currentUser) return { ok: false, error: 'Inicia sesión primero.' };
     try {
       await auth.currentUser.linkWithPopup(new firebase.auth.GoogleAuthProvider());
       return { ok: true };
@@ -694,6 +841,17 @@ G.DB = (() => {
       delete accs[key];
       write(K_ACC, accs);
       remove(K_SAVE + key); remove(K_SES);
+      user = key = save = null;
+      return { ok: true };
+    }
+    if (mode === 'server') {
+      if (!pass) return { ok: false, error: 'Escribe tu contraseña.' };
+      try {
+        clearTimeout(pushT); clearTimeout(retryT); pending = false;
+        await api('POST', 'delete', { pass });
+      } catch (e) { return { ok: false, error: e.message }; }
+      for (const fn of leaveHooks) { try { await fn('delete'); } catch (e) { /* nada */ } }
+      remove(K_SRV + key); remove(K_TOKEN); token = null;
       user = key = save = null;
       return { ok: true };
     }
@@ -724,6 +882,24 @@ G.DB = (() => {
 
   function owns(dex) { return !!(save && save.owned[dex]); }
 
+  // ---------------- amistad ----------------
+  // Cada 10 partidas (de al menos 2 min) con un Pokémon, 1 punto de amistad, hasta 100.
+  // Cada punto: +0,4 % de vida, +0,3 % de ataque y +0,1 % de velocidad (al máximo: +40 / +30 / +10 %).
+  const FRIEND_RUNS = 10, FRIEND_MAX = 100;
+  const FRIEND_PER = { hp: 0.004, atk: 0.003, spd: 0.001 };
+  function friendship(dex) {
+    const runs = (save && save.pruns && save.pruns[dex]) || 0;
+    const pts = Math.min(FRIEND_MAX, Math.floor(runs / FRIEND_RUNS));
+    return { runs, pts, max: FRIEND_MAX, next: pts >= FRIEND_MAX ? 0 : FRIEND_RUNS - (runs % FRIEND_RUNS),
+             hp: FRIEND_PER.hp * pts, atk: FRIEND_PER.atk * pts, spd: FRIEND_PER.spd * pts };
+  }
+  /** Una partida más con ese Pokémon (al acabar una run que cuente). */
+  function countRun(dex) {
+    if (!save || guest) return;
+    save.pruns = save.pruns || {};
+    save.pruns[dex] = (save.pruns[dex] || 0) + 1;
+  }
+
   function grant(dex, from) {
     if (!save.owned[dex]) save.owned[dex] = { at: Date.now(), from };
   }
@@ -747,13 +923,17 @@ G.DB = (() => {
 
   return {
     ready, register, login, loginWithGoogle, playAsGuest, logout, commit, deleteAccount, flush: pushNow,
-    owns, grant, ownsShiny, grantShiny, merge, setName, upgradesOf,
+    owns, grant, ownsShiny, grantShiny, merge, setName, upgradesOf, friendship, countRun,
     onSync(fn) { listeners.add(fn); },
     onLeave(fn) { leaveHooks.push(fn); },
     /** Acceso de bajo nivel para los módulos de red (sólo en modo nube). */
     get fb() { return mode === 'cloud' ? { auth, fs, rtdb, uid, emulator: !!(G.FIREBASE_CONFIG || {}).emulator } : null; },
-    /** ¿Está disponible lo online (amigos, ranking, multijugador)? */
-    get online() { return mode === 'cloud' && !guest && !!uid && !!save; },
+    /** ¿Está disponible lo online (amigos, ranking, multijugador)? En la red local también (server/lan.js). */
+    get online() { return (mode === 'cloud' ? !!uid : mode === 'server' && !!token) && !guest && !!key && !!save; },
+    /** Modo servidor: clave de la cuenta, token de sesión y llamadas a /api/ (para net/social-srv.js y ranking.js). */
+    get key() { return key; },
+    get token() { return mode === 'server' ? token : null; },
+    api(method, route, body) { return mode === 'server' ? api(method, route, body) : Promise.reject({ code: 'server', message: 'No es el modo servidor.' }); },
     /** ¿La cuenta es de usuario y contraseña (no de Google)? */
     get nameAccount() { return nameAccount(); },
     get hasGoogle() { return hasGoogle(); }, linkGoogle,

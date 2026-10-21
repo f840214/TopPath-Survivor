@@ -88,7 +88,17 @@ G.RankingUI = (() => {
     rows.forEach((r, i) => list.appendChild(rowEl(r, i + 1, r.uids.includes(uid), b, done)));
 
     // La frase se monta en cada idioma (traducirla por trozos sale rara).
-    const en = G.I18n.lang === 'en';
+    const en = G.I18n.lang === 'en', zh = G.I18n.lang === 'zh';
+    if (zh) {
+      // Chino: la frase entera aquí (por trozos, "de hoy" se quedaba sin traducir).
+      const zpn = { d: '今日', w: '本週', m: '本月', y: '今年', a: '歷史' }[period];
+      const zwhere = (mode === 's' ? '單人' : '多人') + (dex ? '（' + G.T(G.DEX_BY[dex].name) + '）' : '');
+      $('rk-me').innerHTML = '<span translate="no">' + (!G.Social.me ? '請先在「好友」中選擇暱稱，才能進入排行榜。'
+        : me && me.out ? `你還沒進入${zpn}${zwhere}的前 50 名。確切名次請看「歷史」。`
+        : me ? `你${zpn}${zwhere}的最佳名次：<b class="gold">#${me.pos}</b> · ${fmt(me.t)}`
+        : `你尚無${zpn}${zwhere}的紀錄。`) + '</span>';
+      return;
+    }
     const pn = en ? { d: 'today', w: 'this week', m: 'this month', y: 'this year', a: 'of all time' }[period]
                   : { d: 'de hoy', w: 'de esta semana', m: 'de este mes', y: 'de este año', a: 'de siempre' }[period];
     const mon = dex ? G.DEX_BY[dex].name : '';

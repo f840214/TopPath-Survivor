@@ -39,7 +39,9 @@ G.Gacha = (() => {
     { gen: 6, name: 'Kalos',   color: ['#4a1a3a', '#2a3a7a', '#1a5a7a'] },
     { gen: 7, name: 'Alola',   color: ['#7a3a1a', '#1a6a6a', '#2a4a8a'] },
     { gen: 8, name: 'Galar',   color: ['#4a1a5a', '#1a3a6a', '#6a1a3a'] },
-    { gen: 9, name: 'Paldea',  color: ['#6a2a1a', '#4a1a5a', '#1a4a6a'] }
+    { gen: 9, name: 'Paldea',  color: ['#6a2a1a', '#4a1a5a', '#1a4a6a'] },
+    // Personajes propios (js/data/custom.js): seis magos épicos.
+    { gen: 10, name: 'Dado Arcoíris', color: ['#5a1a6a', '#1a4a7a', '#7a4a1a'], special: true }
   ];
 
   function inBanner(p, gen) { return p.gen === gen && !!G.SPRITE_META[p.dex]; }
@@ -68,7 +70,9 @@ G.Gacha = (() => {
 
   /** Los 3 más fuertes de la generación, para el cartel del banner. */
   function featured(gen) {
-    return G.DEX.filter(p => inBanner(p, gen) && p.rarity === 5)
+    const top = G.DEX.filter(p => inBanner(p, gen) && p.rarity === 5);
+    // Banner sin legendarios (Dado Arcoíris): los tres épicos más fuertes.
+    return (top.length ? top : G.DEX.filter(p => inBanner(p, gen) && p.rarity === 4))
       .sort((a, b) => b.bst - a.bst).slice(0, 3).map(p => p.dex);
   }
 

@@ -16,6 +16,8 @@ META = {}
 for m in re.finditer(r'^\s*(\d+): (\{.*\}),?\s*$', open(os.path.join(ROOT, 'js/data/sprites-meta.js'), encoding='utf-8').read(), re.M):
     try: META[int(m.group(1))] = json.loads(m.group(2))
     except Exception: pass
+# Personajes propios (js/data/custom.js): su geometría viene en gamedata.json.
+for k, v in D.get('customMeta', {}).items(): META[int(k)] = v
 esc = html.escape
 N = len(DEX)
 

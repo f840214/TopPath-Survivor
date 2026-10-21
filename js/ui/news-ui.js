@@ -16,11 +16,16 @@ G.NewsUI = (() => {
     $('news-close').onclick = close;
     refresh();
   }
-  function refresh() { $('btn-news').classList.toggle('new', seen() < latest()); }
+  function refresh() {
+    const unread = seen() < latest();
+    $('btn-news').classList.toggle('new', unread);
+    const m = document.querySelector('#scr-menu [data-go=news]');
+    if (m) { m.classList.toggle('new', unread); const sub = $('menu-news-sub'); if (sub) sub.classList.toggle('gold', unread); }
+  }
 
   function fmt(d) {
     const [y, m, day] = d.split('-').map(Number);
-    return new Date(y, m - 1, day).toLocaleDateString(G.I18n.lang === 'en' ? 'en-GB' : 'es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+    return new Date(y, m - 1, day).toLocaleDateString(G.I18n.lang === 'en' ? 'en-GB' : G.I18n.lang === 'zh' ? 'zh-TW' : 'es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
   }
 
   function open() {

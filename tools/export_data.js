@@ -21,7 +21,7 @@ for (const f of ['js/core/util.js', 'js/core/i18n.js']) load(f);
 // Captura el diccionario inglés (clave en español).
 const add = G.I18n.add;
 G.I18n.add = d => { Object.assign(EN, d); add(d); };
-for (const f of ['js/data/lang-en.js', 'js/core/settings.js', 'js/data/pokedex.js', 'js/data/sprites-meta.js', 'js/data/moves.js', 'js/data/types.js',
+for (const f of ['js/data/lang-en.js', 'js/core/settings.js', 'js/data/pokedex.js', 'js/data/sprites-meta.js', 'js/data/custom.js', 'js/data/moves.js', 'js/data/types.js',
                  'js/data/items.js', 'js/data/achievements.js', 'js/world/tiles.js', 'js/data/funding.js']) {
   try { load(f); } catch (e) { console.warn('aviso', f, e.message); }
 }
@@ -32,6 +32,8 @@ const moves = Object.values(G.Moves.BY_ID).map(m => {
 });
 const out = {
   dex: G.DEX,
+  // Geometría de los personajes propios (no están en sprites-meta.js).
+  customMeta: Object.fromEntries((G.CUSTOM_MONS || []).map(c => [c.dex, c.sprite])),
   legends: G.DEX.filter(p => p.leg).map(p => p.dex),
   moves,
   items: (G.Items.LIST || []).map(i => ({ id: i.id, name: i.name, desc: i.desc })),

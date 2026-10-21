@@ -190,7 +190,7 @@ G.HUD = (() => {
         ctx.fillStyle = beat > 0.5 ? '#e2d0ff' : '#a06bff'; ctx.fill();
         ctx.font = F(800, 11); ctx.textAlign = 'center';
         ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.85)';
-        const l2 = 'GRIETA · ' + Math.ceil(rift.ttl) + ' s';
+        const l2 = (rift.team && G.Coop.vs && rift.team !== G.Coop.myTeam ? 'GRIETA · EQUIPO ' + rift.team : 'GRIETA · ' + Math.ceil(rift.ttl) + ' s');
         ctx.strokeText(l2, 0, -18); ctx.fillStyle = '#e2d0ff'; ctx.fillText(l2, 0, -18);
       }
       ctx.restore();
@@ -388,6 +388,20 @@ G.HUD = (() => {
     const t = performance.now() / 1000;
     let y = top;
     ctx.textAlign = 'left';
+    // Enfrentamiento: marcador por equipos (color, bajas y nivel); el tuyo, resaltado.
+    if (G.Coop.vs) {
+      const sc = G.Coop.scores || [];
+      for (let i = 0; i < sc.length; i++) {
+        const mine = i + 1 === G.Coop.myTeam;
+        ctx.font = F(800, mine ? 11 : 10);
+        ctx.fillStyle = G.Coop.TEAM_COLORS[i];
+        ctx.fillRect(px, y + 1, 9, 9);
+        const txt = 'EQUIPO ' + (i + 1) + (mine ? ' (TÚ)' : '') + ' · NV ' + sc[i][1] + ' · ' + sc[i][0] + ' BAJAS';
+        ctx.fillText(txt, px + 14, y + 9);
+        y += 15;
+      }
+      y += 4;
+    }
     for (const m of G.Coop.mates) {
       if (!m.connected) continue;
       const o = m.pl;
@@ -449,11 +463,12 @@ G.HUD = (() => {
       ctx.textAlign = 'center';
       ctx.font = F(800, 20);
       ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.75)';
-      const msg = G.Coop.players().every(p => p.dead) ? 'Habéis caído todos…' : 'Has caído: un compañero puede levantarte';
+      const msg = pl.pvpDead ? 'Reapareces en ' + Math.ceil(pl.respawnT || 0) + '…'
+        : G.Coop.players().every(p => p.dead) ? 'Habéis caído todos…' : 'Has caído: un compañero puede levantarte';
       ctx.strokeText(msg, w / 2, h * 0.62);
       ctx.fillStyle = '#ffb0b8';
       ctx.fillText(msg, w / 2, h * 0.62);
-      const f = (pl.reviveT || 0) / G.Player.REVIVE_TIME;
+      const f = pl.pvpDead ? 1 - (pl.respawnT || 0) / G.Player.RESPAWN_TIME : (pl.reviveT || 0) / G.Player.REVIVE_TIME;
       if (f > 0) bar(ctx, w / 2 - 110, h * 0.62 + 12, 220, 10, f, '#5fe08a');
       ctx.restore();
     }

@@ -124,7 +124,8 @@
         this.ky += ny * knock;
       }
       if (G.Coop.isHost) G.Coop.hurtShown(this, d, color);
-      if (this.hp <= 0) this.die();
+      // Enfrentamiento: la baja es del equipo de quien dio el último golpe (null = el anfitrión).
+      if (this.hp <= 0) { this.killer = G.Coop.active ? G.Coop.hitFrom : null; this.die(); }
     }
 
     /** Lo que se VE al recibir un golpe. */
@@ -907,6 +908,7 @@
         if (e.remote) continue;
         if (e.dead) {
           pl.kills++;
+          if (G.Coop.vs) G.Coop.enemyKilled(e);
           if (e.boss && !e.judge) pl.bosses++;
           G.Progress.kill(e);
           corpses.push(e);

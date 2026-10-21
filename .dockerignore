@@ -1,0 +1,6 @@
+.git
+server/data
+tools/cache
+node_modules
+*.zip
+.DS_Store

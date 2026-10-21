@@ -9,7 +9,7 @@ G.UI = (() => {
   const $ = id => document.getElementById(id);
   const SCREENS = ['scr-login', 'scr-test', 'scr-result', 'scr-starters', 'scr-menu',
                    'scr-dex', 'scr-upgrades', 'scr-gacha', 'scr-levelup', 'scr-pause', 'scr-over',
-                   'scr-nick', 'scr-friends', 'scr-lobby', 'scr-rank', 'scr-item', 'scr-goals', 'scr-bond', 'scr-mod'];
+                   'scr-nick', 'scr-friends', 'scr-rooms', 'scr-lobby', 'scr-rank', 'scr-item', 'scr-goals', 'scr-bond', 'scr-mod'];
 
   function show(id, keepMenu = false) {
     for (const s of SCREENS) if (s !== id && !(keepMenu && s === 'scr-menu')) $(s).classList.add('hidden');
@@ -31,11 +31,14 @@ G.UI = (() => {
     const s = G.DB.save;
     $('coins').textContent = s ? s.coins.toLocaleString('es') : '0';
     const t = (s && s.tickets) || { t1: 0, t10: 0 };
-    $('tickets-pill').innerHTML = `${G.Icons.html('ticket', 18)} ${t.t1} &nbsp;${G.Icons.html('ticket10', 18)} ${t.t10}`;
+    // Cada ticket con su número en un mismo trozo: la píldora es flex y, al estrecharse, los números se descolocaban.
+    $('tickets-pill').innerHTML = `<span>${G.Icons.html('ticket', 18)} ${t.t1}</span><span>${G.Icons.html('ticket10', 18)} ${t.t10}</span>`;
+    // En el servidor de red local no hay donaciones.
+    if (G.DB.mode === 'server') $('btn-support').classList.add('hidden');
     // Punto de sincronización: verde = guardado en la nube, amarillo = guardando,
     // rojo = sin conexión (se guarda en local y se sube al volver).
     const st = G.DB.guest ? 'guest' : G.DB.syncState;
-    const TIP = { ok: 'Guardado en la nube', syncing: 'Guardando…', pending: 'Guardando…',
+    const TIP = { ok: G.DB.mode === 'server' ? 'Guardado en el servidor' : 'Guardado en la nube', syncing: 'Guardando…', pending: 'Guardando…',
                   offline: 'Sin conexión: se subirá al volver', local: 'Guardado sólo en este navegador', guest: 'Invitado: no se guarda' };
     $('user-pill').innerHTML = G.Icons.html(G.DB.guest ? 'user' : 'crown', 18) + ' <span translate="no">' + (G.DB.guest ? G.T('Invitado') : (G.DB.user || '')) + '</span>' +
       `<i class="sync ${st}" title="${TIP[st] || ''}"></i>`;
@@ -111,6 +114,7 @@ G.UI = (() => {
     $('legal-mail').href = 'mailto:' + CONTACT + '?subject=Pok%C3%A9Survivor';
     $('legal-repo').textContent = REPO.replace('https://', '');
     $('legal-repo').href = REPO;
+    $('legal-repo-row').classList.toggle('hidden', G.DB.mode === 'server');   // en la red local no hay enlace al código
     const canDelete = G.DB.loggedIn && !G.DB.guest;
     $('legal-delete').disabled = !canDelete;
     $('legal-del-msg').textContent = canDelete ? '' : 'Inicia sesión para poder borrar tu cuenta.';
@@ -233,7 +237,7 @@ G.UI = (() => {
 
       // Escala entera para que los píxeles queden nítidos.
       const m = G.Sprites.animMeta(s.dex, 'Idle');
-      const ay = m ? m.ay : 24;
+      const ay = (m ? m.ay : 24) * G.Sprites.sizeK(s.dex);
       let k = s.opts.scale || 2;
       if (s.opts.hero) k = Math.max(1, Math.min(k, Math.floor(cv.height * 0.8 / ay)));
       s.a.scale = k / G.Sprites.PX;

@@ -73,7 +73,17 @@
       if (t) G.Audio.sfx(bad ? 'error' : 'confirm');
     }
 
-    function open() { withNick(() => { G.UI.show('scr-friends', true); msg(''); render(); G.Social.refreshPresence(); }); }
+    const srvMode = () => G.DB.mode === 'server';
+
+    let toolsWired = false;
+    function open() {
+      if (!toolsWired) {
+        toolsWired = true;
+        $('fr-search').oninput = render;
+        $('fr-blocked-btn').onclick = () => $('fr-blocked').classList.toggle('hidden');
+      }
+      withNick(() => { G.UI.show('scr-friends', true); msg(''); render(); G.Social.refreshPresence(); });
+    }
 
     /** "hace 5 min", "hace 2 h", "hace 3 días". */
     function ago(t) {
@@ -93,29 +103,55 @@
 
     function render() {
       const room = G.Social.room;
-      $('fr-me').innerHTML = 'Tu apodo: <b class="gold" translate="no">' + esc(G.Social.me ? G.Social.me.name : '') + '</b> · dáselo a tus amigos para que te añadan.';
+      // Red local: todos los jugadores del servidor son ya tus amigos (no hay que añadir a nadie).
+      const srv = srvMode();
+      $('fr-add').classList.toggle('hidden', srv);
+      $('fr-tools').classList.toggle('hidden', !srv);
+      if (!srv) $('fr-blocked').classList.add('hidden');
+      // La frase se traduce entera antes de meter el nombre (si no, el traductor sólo ve trozos).
+      const meName = '<b class="gold" translate="no">' + esc(G.Social.me ? G.Social.me.name : '') + '</b>';
+      $('fr-me').innerHTML = srv
+        ? G.I18n.f('Jugadores de esta red (todos sois amigos ya). Tú eres {x}.', meName)
+        : 'Tu apodo: ' + meName + ' · dáselo a tus amigos para que te añadan.';
       $('fr-room').classList.toggle('hidden', !room);
-      const list = G.Social.friends.sort((a, b) => {
+      const q = srv ? $('fr-search').value.trim().toLowerCase() : '';
+      const list = G.Social.friends.filter(f => !q || f.name.toLowerCase().includes(q)).sort((a, b) => {
         const rank = f => f.status === 'in' ? 0 : f.status === 'ok' ? (f.online ? (f.play ? 2 : 1) : 3) : 4;
         return rank(a) - rank(b) || a.name.localeCompare(b.name);
       });
       const box = $('fr-list');
       box.innerHTML = '';
+      box.classList.toggle('fr-grid', srv);
+      if (srv) {
+        const on = list.filter(f => f.online).length;
+        $('fr-me').innerHTML += ' <span class="st">· ' + G.I18n.f('En línea: {x} de {x}', on, list.length) + '</span>';
+      }
+      if (srv) renderBlocked();
       if (!list.length) {
-        box.innerHTML = '<p class="sub">Aún no tienes amigos añadidos. Escribe arriba el apodo de un amigo.</p>';
+        box.innerHTML = srv ? (q ? '<p class="sub">Ningún jugador se llama así.</p>' : '<p class="sub">Todavía no hay más jugadores en este servidor.</p>')
+          : '<p class="sub">Aún no tienes amigos añadidos. Escribe arriba el apodo de un amigo.</p>';
         return;
       }
       for (const f of list) {
         const el = document.createElement('div');
-        el.className = 'fr-row';
         const dot = f.status !== 'ok' ? 'pend' : !f.online ? 'off' : f.play ? 'play' : 'on';
         const inRoom = room && room.members.some(m => m.uid === f.uid);
-        el.innerHTML = `<i class="dot ${dot}"></i><b translate="no"><a href="#" class="plink" title="Ver su perfil">${esc(f.name)}</a></b><span class="st">${inRoom ? 'En tu sala' : stateText(f)}</span><span class="grow"></span>`;
+        if (srv) {
+          // Tarjeta con su compañero Pokémon (red local).
+          el.className = 'fr-card' + (f.online ? ' on' : '');
+          if (f.dex && G.DEX_BY[f.dex]) el.appendChild(G.UI.spriteCanvas(f.dex, 96, 84, { scale: 2, lively: !!f.online, shiny: !!(f.shiny && G.DEX_BY[f.dex]) }));
+          else el.insertAdjacentHTML('beforeend', '<div class="fr-nomon">?</div>');
+          el.insertAdjacentHTML('beforeend', `<b translate="no"><a href="#" class="plink" title="Ver su perfil">${esc(f.name)}</a></b>` +
+            `<span class="st"><i class="dot ${dot}"></i> ${inRoom ? 'En tu sala' : stateText(f)}</span><div class="fr-acts"></div>`);
+        } else {
+          el.className = 'fr-row';
+          el.innerHTML = `<i class="dot ${dot}"></i><b translate="no"><a href="#" class="plink" title="Ver su perfil">${esc(f.name)}</a></b><span class="st">${inRoom ? 'En tu sala' : stateText(f)}</span><span class="grow"></span>`;
+        }
         if (f.status === 'ok') el.querySelector('.plink').onclick = e => { e.preventDefault(); G.ProfileUI.show(f.uid); };
         else el.querySelector('.plink').onclick = e => e.preventDefault();
         const btn = (txt, cls, fn) => {
           const b = document.createElement('button');
-          b.className = 'btn small ' + cls; b.textContent = txt; b.onclick = fn; el.appendChild(b); return b;
+          b.className = 'btn small ' + cls; b.textContent = txt; b.onclick = fn; (el.querySelector('.fr-acts') || el).appendChild(b); return b;
         };
         if (f.status === 'in') {
           btn('Aceptar', 'gold', async () => { const r = await G.Social.accept(f.uid); msg(r.ok ? r.msg : r.error, !r.ok); });
@@ -130,8 +166,26 @@
               if (r.ok) G.LobbyUI.open();
             });
           }
-          btn('Quitar', 'ghost', () => { if (confirm('¿Quitar a ' + f.name + ' de tus amigos?')) G.Social.remove(f.uid); });
+          if (!srv) btn('Quitar', 'ghost', () => { if (confirm('¿Quitar a ' + f.name + ' de tus amigos?')) G.Social.remove(f.uid); });
+          else btn('Bloquear', 'ghost', async () => { if (confirm(G.I18n.f('¿Bloquear a {x}? No te podrá invitar ni entrar en tus salas.', f.name))) { const r = await G.Social.block(f.uid, true); if (!r.ok) msg(r.error, true); } });
         }
+        box.appendChild(el);
+      }
+    }
+
+    /** Lista negra (red local): quién está bloqueado, con botón para desbloquear. */
+    function renderBlocked() {
+      const list = G.Social.blocked, box = $('fr-blocked-list');
+      $('fr-blocked-btn').textContent = G.I18n.f('Lista negra ({x})', list.length);
+      box.innerHTML = list.length ? '' : '<p class="sub">No has bloqueado a nadie.</p>';
+      for (const f of list) {
+        const el = document.createElement('div');
+        el.className = 'fr-row';
+        el.innerHTML = `<i class="dot off"></i><b translate="no">${esc(f.name)}</b><span class="grow"></span>`;
+        const b = document.createElement('button');
+        b.className = 'btn small'; b.textContent = 'Desbloquear';
+        b.onclick = async () => { const r = await G.Social.block(f.uid, false); if (!r.ok) msg(r.error, true); };
+        el.appendChild(b);
         box.appendChild(el);
       }
     }
@@ -141,8 +195,20 @@
 
   // ======================= SALA =======================
 
+  /** Aforo de la sala (en la red local lo elige el anfitrión). */
+  const roomMax = room => (room && room.max) || G.Social.MAX_PLAYERS;
+  const isVs = room => !!(room && room.mode === 'vs');
+  /** Enfrentamiento: miembros ordenados por equipo (y cuántos hay en cada uno). */
+  function teamSplit(room) {
+    const n = room.teams || 2, by = [];
+    for (let t = 1; t <= n; t++) by.push(room.members.filter(m => (m.team || 1) === t));
+    return by;
+  }
+  /** ¿Se puede empezar un enfrentamiento? Al menos 2 equipos con alguien. */
+  function vsReady(room) { return teamSplit(room).filter(l => l.length).length >= 2; }
+
   G.LobbyUI = (() => {
-    let membersKey = '';
+    let membersKey = '', promptedRejoin = '';
 
     function init() {
       $('lobby-leave').onclick = async () => {
@@ -153,16 +219,29 @@
       $('lobby-menu').onclick = () => G.MenuUI.open();
       $('lobby-start').onclick = start;
       $('lobby-start').dataset.sfx = 'confirm';
+      // Red local: volver a la partida en marcha tras recargar la página (ver coop.js, rejoin).
+      $('lobby-rejoin').onclick = () => {
+        if (!G.Coop.rejoin()) { G.UI.toast('Conectando con el anfitrión… prueba otra vez en unos segundos.', 3000); return; }
+        $('lobby-rejoin').disabled = true;
+        $('lobby-note').textContent = 'Volviendo a la partida…';
+        setTimeout(() => { $('lobby-rejoin').disabled = false; }, 6000);
+      };
       // Conecta / desconecta la red al entrar o salir de una sala.
       G.Social.on(what => {
         const room = G.Social.room;
         if (room) {
           G.Net.open(room.id, room.isHost, room.host);
           G.Net.syncMembers(room.members.map(m => m.uid));
-        } else if (G.Net.open_) G.Net.close();
+        } else if (G.Net.open_ && !(G.Coop.active && G.DB.mode === 'server')) G.Net.close();   // (red local: en plena partida, la conexión sigue aunque el servidor cierre la sala; ver coop.js)
         if (what === 'room-closed') {
           G.UI.toast('La sala se ha cerrado', 2600);
           if (G.UI.isOpen('scr-lobby')) G.MenuUI.open();
+        }
+        // Tras recargar la página en plena partida: se avisa una vez y se abre la sala para volver.
+        if (what === 'room' && room && G.Social.rejoinable && promptedRejoin !== room.id && G.Game.state === 'ui') {
+          promptedRejoin = room.id;
+          G.UI.toast('Tu partida sigue en marcha: puedes volver a ella.', 4000);
+          if (G.UI.isOpen('scr-menu')) open();
         }
         if (G.UI.isOpen('scr-lobby')) render();
       });
@@ -191,27 +270,53 @@
       const room = G.Social.room;
       if (!room) return;
       const ms = room.members;
-      $('lobby-sub').textContent = room.isHost
-        ? 'Eres el anfitrión. Invita a tus amigos (hasta ' + G.Social.MAX_PLAYERS + ') y empezad cuando estéis.'
+      const vs = isVs(room);
+      $('lobby-sub').textContent = vs
+        ? (room.isHost ? 'Enfrentamiento: elegid equipo y empezad cuando haya al menos dos equipos con alguien.'
+                       : 'Enfrentamiento: elige tu equipo. El anfitrión empezará la partida.')
+        : room.isHost
+        ? 'Eres el anfitrión. Invita a tus amigos (hasta ' + roomMax(room) + ') y empezad cuando estéis.'
         : 'Estás en la sala de ' + ((ms.find(m => m.uid === room.host) || {}).name || '…') + '. El anfitrión empezará la partida.';
 
       // Las tarjetas sólo se rehacen si cambian los miembros (los sprites no parpadean).
-      const key = ms.map(m => m.uid + ':' + m.dex + ':' + (m.shiny ? 1 : 0)).join('|');
+      const key = (vs ? 'vs:' : '') + ms.map(m => m.uid + ':' + m.dex + ':' + (m.shiny ? 1 : 0) + ':' + (m.team || 0)).join('|');
       const box = $('lobby-members');
       if (key !== membersKey) {
         membersKey = key;
         box.innerHTML = '';
-        for (let i = 0; i < G.Social.MAX_PLAYERS; i++) {
-          const m = ms[i];
+        // Enfrentamiento: una fila por equipo (3 huecos cada una), con el color del equipo.
+        const slots = vs ? teamSplit(room).flatMap((list, ti) => [0, 1, 2].map(i => ({ m: list[i], team: ti + 1 })))
+                         : Array.from({ length: roomMax(room) }, (_, i) => ({ m: ms[i], color: G.Coop.COLORS[i] }));
+        box.style.gridTemplateColumns = vs ? 'repeat(3, 1fr)' : '';
+        for (const sl of slots) {
+          const m = sl.m;
           const c = document.createElement('div');
           c.className = 'lob-card' + (m ? '' : ' empty');
+          const col = vs ? G.Coop.TEAM_COLORS[sl.team - 1] : sl.color;
           if (m) {
-            c.style.setProperty('--pc', G.Coop.COLORS[i]);
+            c.style.setProperty('--pc', col);
             c.appendChild(G.UI.spriteCanvas(m.dex, 120, 96, { scale: 2, lively: true, shiny: !!m.shiny }));
-            c.insertAdjacentHTML('beforeend', `<b translate="no">${esc(m.name)}</b><small>${esc((G.DEX_BY[m.dex] || {}).name || '')}</small><span class="conn" data-u="${m.uid}"></span>`);
-          } else c.innerHTML = '<span>Libre</span>';
+            c.insertAdjacentHTML('beforeend', `${vs ? '<small style="color:' + col + '">' + G.I18n.f('Equipo {x}', sl.team) + '</small>' : ''}<b translate="no">${esc(m.name)}</b><small>${esc((G.DEX_BY[m.dex] || {}).name || '')}</small><span class="conn" data-u="${m.uid}"></span>`);
+          } else c.innerHTML = vs ? '<span style="color:' + col + '">' + G.I18n.f('Equipo {x}', sl.team) + '</span><span>Libre</span>' : '<span>Libre</span>';
           box.appendChild(c);
         }
+      }
+      // Enfrentamiento: botones para cambiarte de equipo.
+      const tb = $('lobby-teams');
+      tb.classList.toggle('hidden', !vs);
+      if (vs) {
+        const mine = (ms.find(m => m.uid === G.Social.uid) || {}).team || 1;
+        const by = teamSplit(room);
+        tb.innerHTML = '';
+        by.forEach((list, ti) => {
+          const b = document.createElement('button');
+          b.className = 'btn small' + (mine === ti + 1 ? ' gold' : '');
+          b.style.borderColor = G.Coop.TEAM_COLORS[ti];
+          b.textContent = G.I18n.f('Equipo {x}', ti + 1) + ' (' + list.length + '/3)';
+          b.disabled = mine === ti + 1 || list.length >= 3;
+          b.onclick = async () => { const r = await G.Social.setTeam(ti + 1); if (!r.ok) G.UI.toast(r.error); };
+          tb.appendChild(b);
+        });
       }
       box.querySelectorAll('.conn').forEach(el => {
         const m = ms.find(x => x.uid === el.dataset.u);
@@ -222,7 +327,7 @@
       });
 
       // Invitar (sólo el anfitrión y si queda sitio).
-      const canInvite = room.isHost && ms.length < G.Social.MAX_PLAYERS;
+      const canInvite = room.isHost && ms.length < roomMax(room);
       $('lobby-inv-title').classList.toggle('hidden', !canInvite);
       const inv = $('lobby-invite');
       inv.classList.toggle('hidden', !canInvite);
@@ -246,20 +351,31 @@
       btn.classList.toggle('hidden', !room.isHost);
       const connecting = ms.some(m => m.uid !== room.host && G.Net.mode(m.uid) === 'connecting');
       const failed = ms.some(m => m.uid !== room.host && G.Net.mode(m.uid) === 'failed');
-      btn.disabled = !room.isHost || ms.length < 2 || connecting || failed;
-      btn.textContent = 'Empezar partida (' + ms.length + '/' + G.Social.MAX_PLAYERS + ')';
+      btn.disabled = !room.isHost || ms.length < 2 || connecting || failed || (vs && !vsReady(room));
+      btn.textContent = 'Empezar partida (' + ms.length + '/' + roomMax(room) + ')';
       $('lobby-note').textContent = !room.isHost ? 'Cuando el anfitrión empiece, entraréis todos a la vez.'
         : ms.length < 2 ? 'Necesitas al menos un amigo en la sala.'
+        : vs && !vsReady(room) ? 'Hacen falta al menos dos equipos con algún jugador.'
         : failed ? 'No se puede conectar con algún amigo: su red (o la tuya) no deja jugar en grupo. Probad con otra wifi o datos móviles; se reintenta solo.'
         : connecting ? 'Conectando con tus amigos…' : 'La partida empieza para todos a la vez.';
+      // Partida en marcha a la que puedes volver (recargaste la página): sólo ese botón.
+      const rej = G.Social.rejoinable;
+      $('lobby-rejoin').classList.toggle('hidden', !rej);
+      if (rej) {
+        btn.classList.add('hidden');
+        $('lobby-inv-title').classList.add('hidden'); inv.classList.add('hidden');
+        if (!$('lobby-rejoin').disabled) $('lobby-note').textContent = 'La partida sigue en marcha: puedes volver a ella con tu Pokémon tal como lo tenías.';
+      }
     }
 
     function start() {
       const room = G.Social.room;
       if (!room || !room.isHost || room.members.length < 2) return;
+      if (isVs(room) && !vsReady(room)) return;
       const cfg = {
         k: 'start', seed: Math.floor(Math.random() * 1e6), host: room.host,
-        members: room.members.map(m => ({ uid: m.uid, name: m.name, dex: m.dex, shiny: !!m.shiny }))
+        mode: isVs(room) ? 'vs' : 'coop', teams: isVs(room) ? room.teams : 0,
+        members: room.members.map(m => ({ uid: m.uid, name: m.name, dex: m.dex, shiny: !!m.shiny, team: isVs(room) ? (m.team || 1) : 0 }))
       };
       G.Social.setOpen(false);
       G.Net.broadcast(cfg);

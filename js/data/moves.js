@@ -424,6 +424,8 @@
 
   /** Movimientos que este Pokémon puede aprender (sus tipos + normal). */
   function poolFor(mon) {
+    // Personajes propios (data/custom.js): repertorio fijo.
+    if (mon.moves) return mon.moves.filter(id => BY_ID[id]);
     const ids = new Set(POOL.normal);
     for (const t of mon.types) for (const id of (POOL[t] || [])) ids.add(id);
     return [...ids];

@@ -17,7 +17,7 @@ G.GachaUI = (() => {
       const t = document.createElement('button');
       t.className = 'gen-tab';
       t.dataset.gen = b.gen;
-      t.innerHTML = `<b>${b.name}</b><small>Gen ${b.gen}</small>`;
+      t.innerHTML = `<b>${b.name}</b><small>${b.special ? 'Especial' : 'Gen ' + b.gen}</small>`;
       t.onclick = () => { gen = b.gen; refresh(); };
       tabs.appendChild(t);
     });
@@ -41,8 +41,9 @@ G.GachaUI = (() => {
       `radial-gradient(circle at 80% 30%, rgba(255,210,63,.3), transparent 45%),
        radial-gradient(circle at 15% 80%, rgba(196,123,255,.3), transparent 50%),
        linear-gradient(135deg, ${c1}, ${c2} 55%, ${c3})`;
-    $('banner-title').textContent = banner.name + ' Misterioso';
-    $('banner-desc').textContent = `Los ${all.length} Pokémon de la generación ${gen}. ¡Los legendarios esperan!`;
+    $('banner-title').textContent = banner.special ? banner.name : banner.name + ' Misterioso';
+    $('banner-desc').textContent = banner.special ? `Los ${all.length} magos del Dado Arcoíris: todos épicos. ¡Reúnelos!`
+      : `Los ${all.length} Pokémon de la generación ${gen}. ¡Los legendarios esperan!`;
     $('gacha-owned').innerHTML = `Tienes ${owned} de ${all.length}` +
       (shinies ? ` · ${G.Icons.html('shiny', 12)} ${shinies} shiny` : '');
 

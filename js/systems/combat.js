@@ -129,7 +129,11 @@ G.Combat = (() => {
     const col = G.U.TYPE_COLOR[m.type];
     const half = Math.min(m.arc, 6.2832) / 2;
     G.FX.slash(pl.x, pl.y - G.LIFT * 0.5, pl.aim, m.radius, m.arc, col, G.VFX.forMove(m));
-    if (ghost) return;
+    if (ghost) {
+      const v = pvpVictim(pl);
+      if (v && G.U.dist2(pl.x, pl.y, v.x, v.y) <= (m.radius + v.r) ** 2 && inArc(pl.x, pl.y, v.x, v.y, pl.aim, half)) pvpHurt(v, m.dmg * pl.atk, m.type);
+      return;
+    }
 
     for (const e of G.EnemyMgr.queryCircle(pl.x, pl.y, m.radius)) {
       if (!inArc(pl.x, pl.y, e.x, e.y, pl.aim, half)) continue;
@@ -151,16 +155,20 @@ G.Combat = (() => {
       if (G.World.isWall(pl.x + ca * d, pl.y + sa * d)) { len = d; break; }
     }
     G.FX.beam(pl.x, pl.y - G.LIFT, pl.aim, len, w, col, G.VFX.forMove(m));
-    if (ghost) return;
-    G.Camera.kick(0.08);
-
-    const mx = pl.x + ca * len / 2, my = pl.y + sa * len / 2;
     const onBeam = (x, y, r) => {
       const px = x - pl.x, py = y - pl.y;
       const along = px * ca + py * sa;
       if (along < -r || along > len + r) return false;
       return Math.abs(-px * sa + py * ca) <= w / 2 + r;
     };
+    if (ghost) {
+      const v = pvpVictim(pl);
+      if (v && onBeam(v.x, v.y, v.r)) pvpHurt(v, m.dmg * pl.atk, m.type);
+      return;
+    }
+    G.Camera.kick(0.08);
+
+    const mx = pl.x + ca * len / 2, my = pl.y + sa * len / 2;
     for (const e of G.EnemyMgr.queryCircle(mx, my, len / 2 + w)) {
       if (onBeam(e.x, e.y, e.r)) hit(pl, e, m.dmg * pl.atk, col, ca, sa, 0, m);
     }
@@ -185,7 +193,11 @@ G.Combat = (() => {
           spin: G.VFX.spins(vis.aura) ? G.U.rand(-6, 6) : 0 });
       }
     }
-    if (ghost) return;
+    if (ghost) {
+      const v = pvpVictim(pl);
+      if (v && G.U.dist2(pl.x, pl.y, v.x, v.y) <= (m.radius + v.r) ** 2) pvpHurt(v, m.dmg * pl.atk, m.type);
+      return;
+    }
     let healed = 0;
     for (const e of G.EnemyMgr.queryCircle(pl.x, pl.y, m.radius)) {
       hit(pl, e, m.dmg * pl.atk, col, e.x - pl.x, e.y - pl.y, 0, m);
@@ -305,7 +317,11 @@ G.Combat = (() => {
     // Estela: varias copias del golpe a lo largo del recorrido.
     for (let d = 0; d <= len; d += 22) G.FX.sp(vis.proj || 'streak', vis.pal, sx + ca * d, sy + sa * d - G.LIFT * 0.6, { life: 0.22, angle: pl.aim });
     G.FX.slash(sx + ca * len, sy + sa * len - G.LIFT * 0.5, pl.aim, 34, 2.2, col, vis);
-    if (ghost) return;
+    if (ghost) {
+      const v = pvpVictim(pl);
+      if (v && segDist2(sx, sy, sx + ca * len, sy + sa * len, v.x, v.y) <= ((m.width || 34) / 2 + v.r) ** 2) pvpHurt(v, m.dmg * pl.atk, m.type);
+      return;
+    }
     pl.x = sx + ca * len; pl.y = sy + sa * len;
     G.World.collide(pl);
     pl.invuln = Math.max(pl.invuln || 0, 0.3);
@@ -352,7 +368,11 @@ G.Combat = (() => {
 
   /** Daño de un campo (mina, meteoro, charco) a todo lo que hay en su círculo. */
   function blast(f, r, k = 1) {
-    if (f.ghost) return;
+    if (f.ghost) {
+      const v = pvpVictim(f.owner);
+      if (v && G.U.dist2(f.x, f.y, v.x, v.y) <= (r + v.r) ** 2) pvpHurt(v, f.dmg * k, f.m.type);
+      return;
+    }
     const pl = f.owner, m = f.m;
     for (const e of G.EnemyMgr.queryCircle(f.x, f.y, r)) hit(pl, e, f.dmg * k, f.col, e.x - f.x, e.y - f.y, m.knock || 0, m);
     for (const p of G.World.propsInCircle(f.x, f.y, r)) G.World.damageProp(p, f.dmg * k, f.col);
@@ -365,7 +385,8 @@ G.Combat = (() => {
       if (f.gone || !f.owner || (f.life && f.t >= f.life && f.kind !== 'mine')) { fields.splice(i, 1); continue; }
       if (f.kind === 'mine') {
         const armed = f.t >= f.arm;
-        const trig = armed && G.EnemyMgr.queryCircle(f.x, f.y, 14).length > 0;
+        const pv = f.ghost ? pvpVictim(f.owner) : null;
+        const trig = armed && (G.EnemyMgr.queryCircle(f.x, f.y, 14).length > 0 || (pv && !pv.dead && G.U.dist2(f.x, f.y, pv.x, pv.y) < (14 + pv.r) ** 2));
         if (trig || f.t >= f.life) {
           G.FX.ring(f.x, f.y, 4, f.r, f.col, 0.3, 4);
           G.FX.burst(f.x, f.y - 6, f.col, 10, 150);
@@ -522,6 +543,17 @@ G.Combat = (() => {
     else if (G.Projectiles.all().some(p => p.orb && p.owner === pl)) G.Projectiles.clearOrbs(pl);
   }
 
+  // ---------------- enfrentamiento: daño entre jugadores ----------------
+  // Los ataques de los de OTRO equipo llegan como fantasmas (como los de los
+  // compañeros), pero a ti sí te hacen daño: una cuarta parte (G.Coop.PVP_K).
+  // Lo aplica el que lo recibe, que es quien manda sobre su propia vida.
+  const pvpVictim = attacker => (attacker && attacker.remote && G.Coop.enemyOf(attacker) ? G.Game.player : null);
+  function pvpHurt(v, dmg, type) {
+    if (!v || v.dead) return;
+    v.pvpHit = true;
+    try { v.hurt(Math.max(1, dmg * G.Coop.PVP_K), type); } finally { v.pvpHit = false; }
+  }
+
   // Golpe crítico (Mejoras → Golpe Crítico): x1,5 de daño, número naranja y grande.
   const CRIT_MUL = 1.5;
   const isCrit = pl => !ghost && pl.critChance > 0 && Math.random() < pl.critChance;
@@ -571,6 +603,21 @@ G.Combat = (() => {
       }
 
       // --- disparos de jugadores ---
+      // Enfrentamiento: los disparos (y orbes) de otro equipo te alcanzan a ti.
+      if (p.ghost) {
+        const v = pvpVictim(p.owner);
+        if (v && !v.dead && G.U.dist2(p.x, p.y, v.x, v.y) < (p.r + v.r) * (p.r + v.r)) {
+          if (p.orb) {
+            const last = p.hitLog.get('me') || -99;
+            if (now - last >= p.rehit) { p.hitLog.set('me', now); pvpHurt(v, p.dmg, p.mtype); }
+          } else if (!p.hits.has('me')) {
+            p.hits.add('me');
+            pvpHurt(v, p.dmg, p.mtype);
+            G.FX.burst(p.x, p.y - G.LIFT, p.color, 7, 110);
+            if (p.pierce > 0) p.pierce--; else { projectiles.splice(i, 1); continue; }
+          }
+        }
+      }
       // Orbes de un compañero: sólo se ven.
       if (p.orb && p.ghost) continue;
       if (!p.orb) {

@@ -77,6 +77,8 @@ G.Player = class Player {
 
   /** Segundos que hay que estar junto a un compañero caído para levantarlo. */
   static get REVIVE_TIME() { return 3; }
+  /** Enfrentamiento: segundos hasta reaparecer cuando te derriba otro jugador. */
+  static get RESPAWN_TIME() { return 5; }
 
   // (×2 y luego ×4 el 2026-10-10: se subía de nivel demasiado rápido.)
   static xpFor(level) {
@@ -256,6 +258,8 @@ G.Player = class Player {
       this.anim.play('Faint', { hold: true });
       G.Projectiles.clearOrbs(this);
       this.reviveT = 0;
+      // Enfrentamiento: si te ha derribado otro jugador, reapareces solo a los 5 s.
+      if (this.pvpHit) { this.pvpDead = true; this.respawnT = Player.RESPAWN_TIME; }
     }
   }
 
@@ -386,6 +390,7 @@ G.Player = class Player {
   /** Vuelve a levantarse (lo revive un compañero en cooperativo). */
   revive(frac = 0.5) {
     this.dead = false;
+    this.pvpDead = false; this.respawnT = 0;
     this.hp = Math.max(1, this.maxHp * frac);
     this.invuln = 2;
     this.reviveT = 0;
