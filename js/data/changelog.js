@@ -14,6 +14,8 @@ G.CHANGELOG = [
     ['El título del juego es ahora TopPath Survivor, en azul (también en la pestaña del navegador), y ya no sale la frase de broma bajo el título.',
      'The game title is now TopPath Survivor, in blue (also in the browser tab), and the joke line under the title is gone.']
   ], fix: [
+    ['Contra las trampas: las teclas, clics y toques que se inventa un programa dentro de la página ya no mueven ni atacan, y las partidas con el navegador manejado por un programa (bots e IA que juegan solas) no suben al ranking.',
+     'Anti-cheat: keys, clicks and touches made up by a program inside the page no longer move or attack, and runs where the browser is driven by a program (bots and AIs that play on their own) do not go to the leaderboard.'],
     ['Colección: al tocar a Belle o a un mago del Dado Arcoíris ya se abre su ficha (se quedaba la del Pokémon de antes). Ahora tienen también Ataque, At. Esp., Defensa y Def. Esp.',
      'Collection: tapping Belle or a Rainbow Dice mage now opens their page (the previous Pokémon stayed on screen). They now also have Attack, Sp. Atk, Defense and Sp. Def.']
   ] },
