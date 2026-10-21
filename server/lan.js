@@ -21,6 +21,8 @@ const path = require('path'), crypto = require('crypto');
 const ws = require('./ws');
 
 const GRACE = 180 * 1000;         // 對戰中斷線者的位置保留時間（重新整理＋登入也來得及）
+const LOBBY_GRACE = 30 * 1000;    // 大廳（還沒開始）斷線者的位置保留時間：網路閃一下、手機切到別的 App 不會把房間關掉
+const log = (...a) => console.log(new Date().toLocaleString('zh-TW', { hour12: false }), ...a);
 const TOP = 50, MAX_PLAYERS = 8, MAX_T = 3600, MIN_T = 120;
 // 對抗賽：最多 3 隊、每隊 3 人（9 人）。
 const VS_TEAM = 3, VS_TEAMS_MAX = 3;
@@ -187,6 +189,7 @@ module.exports = function createLan(ctx) {
     for (const m of r.members.values()) { const c = conns.get(m.uid); if (c && c.room === r.id) c.conn.send(msg); }
   }
   function closeRoom(r) {
+    log('[房間] 關閉', r.id);
     rooms.delete(r.id);
     const msg = JSON.stringify({ k: 'room.closed', room: r.id });
     for (const m of r.members.values()) {
@@ -212,7 +215,7 @@ module.exports = function createLan(ctx) {
     c.room = '';
     if (r) removeMember(r, c.key);
   }
-  /** 連線斷了：在大廳就直接移除；對戰中則保留位置一段時間。 */
+  /** 連線斷了：保留位置一段時間（大廳 LOBBY_GRACE、對戰中 GRACE），時間到還沒回來才移除。 */
   function connGone(c) {
     if (!c.room) return;
     const r = rooms.get(c.room);
@@ -220,10 +223,13 @@ module.exports = function createLan(ctx) {
     if (!r) return;
     const m = r.members.get(c.key);
     if (!m) return;
-    if (r.open) { removeMember(r, c.key); return; }
     m.on = false;
     clearTimeout(m.goneT);
-    m.goneT = setTimeout(() => { if (rooms.get(r.id) === r && !m.on) removeMember(r, c.key); }, GRACE);
+    m.goneT = setTimeout(() => {
+      if (rooms.get(r.id) !== r || m.on) return;
+      log('[房間]', c.name, '沒有回來，移出', r.id);
+      removeMember(r, c.key);
+    }, r.open ? LOBBY_GRACE : GRACE);
     sendRoom(r);
   }
 
@@ -264,7 +270,7 @@ module.exports = function createLan(ctx) {
     // 同一帳號從另一個分頁或裝置連進來：保留新的（並接手原本的房間）。
     const old = conns.get(ses.key);
     let room = '';
-    if (old) { room = old.room; old.room = ''; old.conn.close(); conns.delete(ses.key); }
+    if (old) { log('[連線]', ses.acc.name, '從另一個分頁或裝置登入，關掉舊的連線'); room = old.room; old.room = ''; old.conn.close(1000, '被新的登入取代'); conns.delete(ses.key); }
     // 重新整理頁面後回來：還保留著位置的房間（對戰中斷線的那種）也接回去。
     if (!room) for (const r of rooms.values()) if (r.members.has(ses.key)) { room = r.id; break; }
     const c = { conn, key: ses.key, name: ses.acc.name, play: false, room };
@@ -273,7 +279,9 @@ module.exports = function createLan(ctx) {
     // hello 帶上目前所在的房間：客戶端重新整理後才知道自己還在對戰裡。
     conn.send(JSON.stringify({ k: 'hello', uid: c.key, name: c.name, grace: GRACE, blocks: blocksOf(c.key), room: c.room && rooms.get(c.room) ? roomView(rooms.get(c.room)) : null }));
     conn.on('message', text => { let m; try { m = JSON.parse(text); } catch (e) { return; } if (m && typeof m === 'object') onMessage(c, m); });
+    log('[連線]', c.name, '連上', req.socket.remoteAddress || '', room ? '（回到房間 ' + room + '）' : '');
     conn.on('close', () => {
+      log('[連線]', c.name, '斷線：', conn.why || '?', c.room ? '（在房間 ' + c.room + '）' : '');
       if (conns.get(ses.key) !== c) return;
       conns.delete(ses.key);
       touchSeen(ses.key);

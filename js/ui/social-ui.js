@@ -341,8 +341,10 @@
       inv.classList.toggle('hidden', !canInvite);
       if (canInvite) {
         inv.innerHTML = '';
-        const free = G.Social.friends.filter(f => f.status === 'ok' && !ms.some(m => m.uid === f.uid));
-        if (!free.length) inv.innerHTML = '<p class="sub" style="margin:0">Aún no tienes amigos añadidos.</p>';
+        // (Red local: todos son amigos; sólo se ofrece a quien está conectado ahora.)
+        const srv = G.DB.mode === 'server';
+        const free = G.Social.friends.filter(f => f.status === 'ok' && (!srv || f.online) && !ms.some(m => m.uid === f.uid));
+        if (!free.length) inv.innerHTML = '<p class="sub" style="margin:0">' + (srv ? 'No hay nadie más conectado ahora mismo.' : 'Aún no tienes amigos añadidos.') + '</p>';
         for (const f of free) {
           const el = document.createElement('div');
           el.className = 'fr-row';

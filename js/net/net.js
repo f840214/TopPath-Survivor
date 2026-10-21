@@ -194,7 +194,9 @@ G.Net = (() => {
     catch (e) { p.mode = 'relay'; emitPeer(u); return p; }
     pc.onicecandidate = e => { if (e.candidate) signal(u, { c: e.candidate.toJSON() }); };
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === 'failed' && p.mode !== 'closed') useRelay(u);
+      if (pc.connectionState !== 'failed' || p.mode === 'closed') return;
+      if (p.mode === 'direct') p.mode = 'connecting';     // (si no, useRelay no hace nada: el canal ya no sirve)
+      useRelay(u);
     };
     // Si en unos segundos no hay canal directo, se sigue por el relé.
     p.timer = setTimeout(() => { if (p.mode === 'connecting') useRelay(u); }, DIRECT_TIMEOUT);
@@ -327,7 +329,10 @@ G.Net = (() => {
     if (!roomId) return;
     const p = peers.get(to);
     stats.sent++;
-    if (p && p.dc && p.dc.readyState === 'open') {
+    // (Red local) Si el canal directo se ha quedado "disconnected" (wifi que se corta un momento),
+    // lo mandado por él se pierde sin avisar: mientras tanto va por el relé del servidor.
+    const shaky = p && p.pc && p.pc.connectionState === 'disconnected' && allowRelay();
+    if (p && p.dc && p.dc.readyState === 'open' && !shaky) {
       try {
         const json = JSON.stringify(msg), jsonBytes = G.NetCodec.size(json);
         const packed = p.binaryVersion === G.NetCodec.version && msg && msg.k === 'f'

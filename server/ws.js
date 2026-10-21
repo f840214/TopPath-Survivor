@@ -24,13 +24,13 @@ class Conn extends EventEmitter {
     this.buf = Buffer.alloc(0);
     this.frags = [];                   // 被拆成多段的訊息片段
     socket.on('data', d => this.onData(d));
-    socket.on('close', () => this.finish());
-    socket.on('error', () => this.finish());
-    socket.on('end', () => this.finish());
+    socket.on('close', () => this.finish('socket 關閉'));
+    socket.on('error', e => this.finish('socket 錯誤 ' + (e && e.code || '')));
+    socket.on('end', () => this.finish('對方結束連線'));
     // 每 20 秒 ping 一次：沒有正常斷線的客戶端靠這個偵測。
     this.pingT = setInterval(() => {
       if (!this.open) return;
-      if (this.waitingPong) { this.finish(); return; }
+      if (this.waitingPong) { this.finish('20 秒沒回 pong'); return; }
       this.waitingPong = true;
       this.frame(0x9, Buffer.alloc(0));
     }, 20000);
@@ -45,7 +45,7 @@ class Conn extends EventEmitter {
       let len = b[1] & 0x7f, off = 2;
       if (len === 126) { if (b.length < 4) return; len = b.readUInt16BE(2); off = 4; }
       else if (len === 127) { if (b.length < 10) return; len = Number(b.readBigUInt64BE(2)); off = 10; }
-      if (len > MAX_MSG) return this.close(1009);
+      if (len > MAX_MSG) return this.close(1009, '訊息太大');
       if (masked) off += 4;
       if (b.length < off + len) return;
       let data = b.subarray(off, off + len);
@@ -61,7 +61,7 @@ class Conn extends EventEmitter {
   }
 
   onFrame(fin, op, data) {
-    if (op === 0x8) { this.close(1000); return; }
+    if (op === 0x8) { this.close(1000, '客戶端關閉'); return; }
     if (op === 0x9) { this.frame(0xa, data); return; }
     if (op === 0xa) { this.waitingPong = false; return; }
     if (op === 0x1 || op === 0x2 || op === 0x0) {
@@ -69,7 +69,7 @@ class Conn extends EventEmitter {
       if (!fin) return;
       const whole = this.frags.length === 1 ? this.frags[0] : Buffer.concat(this.frags);
       this.frags = [];
-      if (whole.length > MAX_MSG) return this.close(1009);
+      if (whole.length > MAX_MSG) return this.close(1009, '訊息太大');
       this.emit('message', whole.toString('utf8'));
     }
   }
@@ -82,21 +82,22 @@ class Conn extends EventEmitter {
     else if (len < 65536) { head = Buffer.allocUnsafe(4); head[1] = 126; head.writeUInt16BE(len, 2); }
     else { head = Buffer.allocUnsafe(10); head[1] = 127; head.writeBigUInt64BE(BigInt(len), 2); }
     head[0] = 0x80 | op;
-    try { this.socket.write(Buffer.concat([head, payload])); } catch (e) { this.finish(); }
+    try { this.socket.write(Buffer.concat([head, payload])); } catch (e) { this.finish('寫入失敗'); }
   }
 
   send(text) { this.frame(0x1, Buffer.from(String(text), 'utf8')); }
 
-  close(code = 1000) {
+  close(code = 1000, why = '伺服器關閉') {
     if (!this.open) return;
     const p = Buffer.allocUnsafe(2); p.writeUInt16BE(code, 0);
     this.frame(0x8, p);
-    this.finish();
+    this.finish(why);
   }
 
-  finish() {
+  finish(why = '') {
     if (!this.open) return;
     this.open = false;
+    this.why = why;               // 斷線原因（server/lan.js 會寫進 log）
     clearInterval(this.pingT);
     try { this.socket.end(); } catch (e) { /* 略 */ }
     setTimeout(() => { try { this.socket.destroy(); } catch (e) { /* 略 */ } }, 500);

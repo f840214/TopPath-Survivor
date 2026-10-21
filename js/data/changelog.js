@@ -14,6 +14,12 @@ G.CHANGELOG = [
     ['El título del juego es ahora TopPath Survivor, en azul (también en la pestaña del navegador), y ya no sale la frase de broma bajo el título.',
      'The game title is now TopPath Survivor, in blue (also in the browser tab), and the joke line under the title is gone.']
   ], fix: [
+    ['Multijugador: si el wifi se corta un momento o el anfitrión cambia a otra app, la sala ya no se cierra: se le guarda el sitio 30 s para que vuelva.',
+     'Multiplayer: if the wifi drops for a moment or the host switches to another app, the room no longer closes: their place is kept for 30 s so they can come back.'],
+    ['Multijugador: cuando la conexión directa entre dos jugadores falla un momento, la partida sigue por el servidor en vez de quedarse parada o desconectar.',
+     'Multiplayer: when the direct connection between two players hiccups, the game carries on through the server instead of freezing or disconnecting.'],
+    ['Sala: la lista para invitar ya sólo muestra a quien está conectado (salían también los que no estaban).',
+     'Room: the invite list now only shows people who are online (offline people were listed too).'],
     ['Colección: al tocar a Belle o a un mago del Dado Arcoíris ya se abre su ficha (se quedaba la del Pokémon de antes). Ahora tienen también Ataque, At. Esp., Defensa y Def. Esp.',
      'Collection: tapping Belle or a Rainbow Dice mage now opens their page (the previous Pokémon stayed on screen). They now also have Attack, Sp. Atk, Defense and Sp. Def.']
   ] },

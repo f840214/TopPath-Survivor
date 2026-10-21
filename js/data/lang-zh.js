@@ -903,6 +903,9 @@ G.I18n.add({
   "Apodo de tu amigo": "好友的暱稱",
   "Añadir amigo": "新增好友",
   "Aún no tienes amigos añadidos. Escribe arriba el apodo de un amigo.": "你尚未新增好友，請在上方輸入好友的暱稱。",
+  "Aún no tienes amigos añadidos.": "你尚未新增好友。",
+  "No hay nadie más conectado ahora mismo.": "目前沒有其他人在線上。",
+  'Sala: la lista para invitar ya sólo muestra a quien está conectado (salían también los que no estaban).': '房間：邀請名單現在只會顯示在線上的人（之前沒上線的人也會出現）。',
   "Quiere ser tu amigo": "想加你為好友",
   "Solicitud enviada": "已送出邀請",
   "Desconectado": "離線",
@@ -3742,6 +3745,8 @@ G.I18n.add({
   'El juego está en inglés y en chino tradicional (se elige en Ajustes). El español ya no se ofrece.': '遊戲提供英文與繁體中文（在「設定」中選擇），不再提供西班牙文。',
   'Llega todo lo nuevo de la versión oficial hasta el 20 de octubre (38 ataques nuevos, Movimiento inicial, colección con buscador y favoritos, cooperativo más seguro...), sin perder nada de la red local.': '加入官方版截至 10 月 20 日的所有新內容（38 種新招式、初始招式、可搜尋和加入最愛的圖鑑、更安全的合作模式……），區網版的功能全部保留。',
   'Colección: al tocar a Belle o a un mago del Dado Arcoíris ya se abre su ficha (se quedaba la del Pokémon de antes). Ahora tienen también Ataque, At. Esp., Defensa y Def. Esp.': '圖鑑：點選 Belle 或彩骰的魔法師時，現在會正確打開他們的資料（之前會停留在上一隻寶可夢）。他們現在也有攻擊、特攻、防禦和特防數值。',
+  'Multijugador: si el wifi se corta un momento o el anfitrión cambia a otra app, la sala ya no se cierra: se le guarda el sitio 30 s para que vuelva.': '多人遊戲：Wi-Fi 短暫斷線或房主切換到其他 App 時，房間不會再直接關閉，會保留位置 30 秒讓他回來。',
+  'Multijugador: cuando la conexión directa entre dos jugadores falla un momento, la partida sigue por el servidor en vez de quedarse parada o desconectar.': '多人遊戲：玩家之間的直接連線短暫中斷時，遊戲會改由伺服器轉送繼續進行，不會卡住或斷線。',
   'El título del juego es ahora TopPath Survivor, en azul (también en la pestaña del navegador), y ya no sale la frase de broma bajo el título.': '遊戲標題改為藍色的 TopPath Survivor（瀏覽器分頁標題也一樣），標題下方的玩笑標語也拿掉了。',
   // TopPath Survivor (21-10-2026)
   "TopPath Survivor se juega en horizontal.": "TopPath Survivor 需以橫向模式遊玩。",
